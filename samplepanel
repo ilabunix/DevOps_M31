@@ -1,0 +1,64 @@
+<div style="text-align: center; padding: 25px; background-color: #1E2A38; color: white; border-radius: 8px;">
+    <img src="https://raw.githubusercontent.com/aws-samples/aws-icons-for-architecture-diagrams/main/Management-Governance/AWS-Health-Dashboard.svg" width="80">
+    <h1 style="margin-top: 15px; font-size: 32px;">AWS Infrastructure Health Overview</h1>
+    <h3 style="margin-top: 5px; font-size: 20px; font-weight: normal;">
+        Real-Time Monitoring | Performance Optimization | Incident Response
+    </h3>
+    <p style="font-size: 18px; margin-top: 15px; max-width: 800px; margin-left: auto; margin-right: auto;">
+        This dashboard provides a **centralized view of key AWS services**, ensuring system health and reliability.  
+        Monitor real-time metrics across **Compute, Storage, Networking, and Databases**,  
+        and take proactive actions to prevent performance degradation.
+    </p>
+
+    <hr style="margin: 25px 0; border: 1px solid #ffffff30;">
+
+    <h3 style="margin-top: 10px; font-size: 22px;">🔍 Detailed Resource Monitoring</h3>
+    <p style="font-size: 18px; margin-top: 10px;">
+        For in-depth analysis of individual AWS services, navigate to the respective sub-dashboards:
+    </p>
+
+    <table style="width:100%; text-align:center; font-size: 18px; margin-top: 15px;">
+      <tr>
+        <td>
+          <img src="https://raw.githubusercontent.com/aws-samples/aws-icons-for-architecture-diagrams/main/Compute/Amazon-EC2.svg" width="50"><br>
+          <strong>EC2 Performance</strong>
+          <ul style="list-style: none; padding: 0; font-size: 16px; margin-top: 5px;">
+            <li><a href="https://your-grafana-instance/d/your-ec2-overview-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Overview</a></li>
+            <li><a href="https://your-grafana-instance/d/your-ec2-instance-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Instance Details</a></li>
+            <li><a href="https://your-grafana-instance/d/your-ec2-network-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Network Performance</a></li>
+          </ul>
+        </td>
+        <td>
+          <img src="https://raw.githubusercontent.com/aws-samples/aws-icons-for-architecture-diagrams/main/Database/Amazon-RDS.svg" width="50"><br>
+          <strong>RDS Performance</strong>
+          <ul style="list-style: none; padding: 0; font-size: 16px; margin-top: 5px;">
+            <li><a href="https://your-grafana-instance/d/your-rds-overview-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Overview</a></li>
+            <li><a href="https://your-grafana-instance/d/your-rds-query-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Query Performance</a></li>
+            <li><a href="https://your-grafana-instance/d/your-rds-storage-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Storage Usage</a></li>
+          </ul>
+        </td>
+        <td>
+          <img src="https://raw.githubusercontent.com/aws-samples/aws-icons-for-architecture-diagrams/main/Networking-and-Content-Delivery/Amazon-VPC.svg" width="50"><br>
+          <strong>VPC & Network</strong>
+          <ul style="list-style: none; padding: 0; font-size: 16px; margin-top: 5px;">
+            <li><a href="https://your-grafana-instance/d/your-vpc-overview-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Overview</a></li>
+            <li><a href="https://your-grafana-instance/d/your-vpc-traffic-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Traffic Flow</a></li>
+            <li><a href="https://your-grafana-instance/d/your-vpc-security-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Security Groups</a></li>
+          </ul>
+        </td>
+        <td>
+          <img src="https://raw.githubusercontent.com/aws-samples/aws-icons-for-architecture-diagrams/main/Storage/Amazon-S3.svg" width="50"><br>
+          <strong>S3 & Storage</strong>
+          <ul style="list-style: none; padding: 0; font-size: 16px; margin-top: 5px;">
+            <li><a href="https://your-grafana-instance/d/your-s3-overview-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Overview</a></li>
+            <li><a href="https://your-grafana-instance/d/your-s3-bucket-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 Bucket Metrics</a></li>
+            <li><a href="https://your-grafana-instance/d/your-ebs-usage-dashboard-id" style="text-decoration: none; color: #1f9aff;">🔹 EBS Utilization</a></li>
+          </ul>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin-top: 20px; font-size: 18px;">
+        🚀 Click on a service above to explore **detailed metrics and trends**.
+    </p>
+</div>
