@@ -1,0 +1,46 @@
+//@version=5
+strategy("VWAP + EMA Strategy (Backtest Ready)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === INPUTS ===
+emaShort = input.int(9, title="Short EMA")
+emaLong = input.int(20, title="Long EMA")
+tpPerc = input.float(0.5, title="Take Profit %", step=0.1)
+slPerc = input.float(0.3, title="Stop Loss %", step=0.1)
+enableShorts = input.bool(true, title="Enable Short Trades")
+
+// Session time inputs (ET)
+useTimeFilter = input.bool(true, title="Use Time Filter (ET 9:30–11:30)")
+sessionStart = input.time(timestamp("2023-01-01T09:30:00"), "Session Start (ET)")
+sessionEnd = input.time(timestamp("2023-01-01T11:30:00"), "Session End (ET)")
+
+// ATR filter
+useRangeFilter = input.bool(false, title="Use ATR Filter")
+atrPeriod = input.int(14, title="ATR Period")
+minAtr = input.float(10, title="Minimum ATR")
+
+// === INDICATORS ===
+vwap = ta.vwap
+ema9 = ta.ema(close, emaShort)
+ema20 = ta.ema(close, emaLong)
+atr = ta.atr(atrPeriod)
+
+// === FILTERS ===
+timeOk = not useTimeFilter or (time >= sessionStart and time <= sessionEnd)
+atrOk = not useRangeFilter or atr >= minAtr
+
+// === LONG CONDITIONS ===
+longCond = close > vwap and ema9 > ema20 and close > ema9 and close > ema20 and ta.crossover(close, vwap)
+if (longCond and timeOk and atrOk)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("TP/SL Long", "Long", limit=close * (1 + tpPerc / 100), stop=close * (1 - slPerc / 100))
+
+// === SHORT CONDITIONS ===
+shortCond = enableShorts and close < vwap and ema9 < ema20 and close < ema9 and close < ema20 and ta.crossunder(close, vwap)
+if (shortCond and timeOk and atrOk)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("TP/SL Short", "Short", limit=close * (1 - tpPerc / 100), stop=close * (1 + slPerc / 100))
+
+// === PLOTS ===
+plot(vwap, color=color.orange, title="VWAP")
+plot(ema9, color=color.blue, title="EMA 9")
+plot(ema20, color=color.red, title="EMA 20")
