@@ -1,0 +1,36 @@
+//@version=5
+strategy("Working VWAP + EMA Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === Indicators ===
+vwap = ta.vwap
+ema9 = ta.ema(close, 9)
+ema20 = ta.ema(close, 20)
+
+// === Conditions ===
+// Long: price above VWAP, 9 EMA above 20 EMA
+longCond = close > vwap and ema9 > ema20
+
+// Short: price below VWAP, 9 EMA below 20 EMA
+shortCond = close < vwap and ema9 < ema20
+
+// === Entry Logic ===
+// Enter long only if not in position
+if (longCond and strategy.position_size <= 0)
+    strategy.entry("Long", strategy.long)
+
+// Enter short only if not in position
+if (shortCond and strategy.position_size >= 0)
+    strategy.entry("Short", strategy.short)
+
+// === Exit Logic ===
+// Simple exits: reverse on opposite signal
+if (shortCond and strategy.position_size > 0)
+    strategy.close("Long")
+
+if (longCond and strategy.position_size < 0)
+    strategy.close("Short")
+
+// === Plotting ===
+plot(vwap, title="VWAP", color=color.orange)
+plot(ema9, title="EMA 9", color=color.blue)
+plot(ema20, title="EMA 20", color=color.red)
