@@ -1,0 +1,29 @@
+//@version=5
+strategy("Simple VWAP + 9/20 EMA Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === EMAs & VWAP ===
+ema9 = ta.ema(close, 9)
+ema20 = ta.ema(close, 20)
+vwap = ta.vwap
+
+// === Long Condition ===
+longCond = close > vwap and ema9 > ema20 and close > ema9 and close > ema20
+
+// === Short Condition ===
+shortCond = close < vwap and ema9 < ema20 and close < ema9 and close < ema20
+
+// === Entries ===
+if (longCond)
+    strategy.entry("Long", strategy.long)
+
+if (shortCond)
+    strategy.entry("Short", strategy.short)
+
+// === TP/SL (Optional — You can remove or adjust) ===
+strategy.exit("Exit Long", from_entry="Long", limit=close * 1.005, stop=close * 0.997)
+strategy.exit("Exit Short", from_entry="Short", limit=close * 0.995, stop=close * 1.003)
+
+// === Plotting ===
+plot(vwap, title="VWAP", color=color.orange)
+plot(ema9, title="EMA 9", color=color.blue)
+plot(ema20, title="EMA 20", color=color.red)
