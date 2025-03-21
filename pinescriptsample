@@ -1,0 +1,78 @@
+//@version=5
+strategy("Trend Navigator: VWAP + EMA (Pro Version)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === INPUTS ===
+emaShort = input.int(9, title="Short EMA")
+emaLong = input.int(20, title="Long EMA")
+tpPerc = input.float(0.5, title="Take Profit %", step=0.1)
+slPerc = input.float(0.3, title="Stop Loss %", step=0.1)
+enableShorts = input.bool(true, title="Enable Short Trades")
+
+// Session Inputs
+useTimeFilter = input.bool(true, title="Use Session Time Filter")
+sessionStartHour = input.int(9, title="Session Start Hour (ET)")
+sessionStartMinute = input.int(30, title="Session Start Minute (ET)")
+sessionEndHour = input.int(11, title="Session End Hour (ET)")
+sessionEndMinute = input.int(30, title="Session End Minute (ET)")
+
+// Range Filter Inputs
+useRangeFilter = input.bool(false, title="Avoid Low ATR Range")
+atrPeriod = input.int(14, title="ATR Period")
+minAtr = input.float(10, title="Minimum ATR Value")
+
+// === INDICATORS ===
+vwap = ta.vwap
+ema9 = ta.ema(close, emaShort)
+ema20 = ta.ema(close, emaLong)
+atr = ta.atr(atrPeriod)
+
+// === TIME & RANGE FILTERS ===
+inSession = not useTimeFilter or (hour >= sessionStartHour and minute >= sessionStartMinute and hour <= sessionEndHour and minute <= sessionEndMinute)
+atrOK = not useRangeFilter or (atr >= minAtr)
+
+// === STRATEGY CONDITIONS ===
+// Long Setup
+longBias = close > vwap and ema9 > ema20
+longEntryCond = longBias and close > ema9 and close > ema20 and ta.crossover(close, vwap) and inSession and atrOK
+
+// Short Setup
+shortBias = close < vwap and ema9 < ema20
+shortEntryCond = enableShorts and shortBias and close < ema9 and close < ema20 and ta.crossunder(close, vwap) and inSession and atrOK
+
+// === STRATEGY EXECUTION ===
+longTP = close * (1 + tpPerc / 100)
+longSL = close * (1 - slPerc / 100)
+
+shortTP = close * (1 - tpPerc / 100)
+shortSL = close * (1 + slPerc / 100)
+
+if (longEntryCond)
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long Exit", "Long", limit=longTP, stop=longSL)
+    alert("VWAP Strategy: Long Entry Triggered", alert.freq_once_per_bar)
+
+if (shortEntryCond)
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short Exit", "Short", limit=shortTP, stop=shortSL)
+    alert("VWAP Strategy: Short Entry Triggered", alert.freq_once_per_bar)
+
+// === DASHBOARD PANEL ===
+bgcolor(color.new(color.gray, 95))
+var table dashboard = table.new(position.bottom_right, 4, 4, border_width=1)
+
+table.cell(dashboard, 0, 0, "Current Bias", bgcolor=color.gray, text_color=color.white)
+table.cell(dashboard, 0, 1, longBias ? "LONG" : shortBias ? "SHORT" : "NEUTRAL", bgcolor=longBias ? color.new(color.green, 85) : shortBias ? color.new(color.red, 85) : color.new(color.gray, 85))
+
+table.cell(dashboard, 1, 0, "In Session", bgcolor=color.gray, text_color=color.white)
+table.cell(dashboard, 1, 1, inSession ? "YES" : "NO", bgcolor=inSession ? color.new(color.green, 85) : color.new(color.red, 85))
+
+table.cell(dashboard, 2, 0, "ATR OK?", bgcolor=color.gray, text_color=color.white)
+table.cell(dashboard, 2, 1, atrOK ? "YES" : "NO", bgcolor=atrOK ? color.new(color.green, 85) : color.new(color.red, 85))
+
+table.cell(dashboard, 3, 0, "Entry Active?", bgcolor=color.gray, text_color=color.white)
+table.cell(dashboard, 3, 1, (longEntryCond or shortEntryCond) ? "YES" : "NO", bgcolor=(longEntryCond or shortEntryCond) ? color.new(color.green, 85) : color.new(color.gray, 85))
+
+// === PLOTS ===
+plot(vwap, color=color.orange, title="VWAP")
+plot(ema9, color=color.blue, title="EMA 9")
+plot(ema20, color=color.red, title="EMA 20")
