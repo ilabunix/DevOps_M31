@@ -1,0 +1,72 @@
+//@version=5
+strategy("Multi-Mode EMA Strategy: Intraday | Scalping | Scalping Pro", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === INPUTS ===
+mode = input.string(defval="Intraday", title="Strategy Mode", options=["Intraday", "Scalping", "Scalping Pro"])
+tickSize = syminfo.mintick
+fixedTicks = 100
+fixedPoints = fixedTicks * tickSize
+
+// === TIMEFRAMES ===
+tf_5m = "5"
+tf_15m = "15"
+tf_30m = "30"
+
+// === EMAs ===
+ema5_5m    = request.security(syminfo.tickerid, tf_5m, ta.ema(close, 5), lookahead=barmerge.lookahead_on)
+ema8_15m   = request.security(syminfo.tickerid, tf_15m, ta.ema(close, 8), lookahead=barmerge.lookahead_on)
+ema21_30m  = request.security(syminfo.tickerid, tf_30m, ta.ema(close, 21), lookahead=barmerge.lookahead_on)
+
+// === Select EMAs based on mode
+emaFast = mode == "Intraday" ? ema8_15m : ema5_5m
+emaSlow = mode == "Intraday" ? ema21_30m : ema8_15m
+
+// === Crossover Logic
+longEntry  = ta.crossover(emaFast, emaSlow)
+shortEntry = ta.crossunder(emaFast, emaSlow)
+
+longExit   = shortEntry
+shortExit  = longEntry
+
+// === Strategy Logic ===
+if (mode == "Scalping Pro")
+    if (longEntry)
+        strategy.entry("Long-Pro", strategy.long)
+        strategy.exit("TP/SL Long-Pro", from_entry="Long-Pro", profit=fixedPoints, loss=fixedPoints)
+    if (shortEntry)
+        strategy.entry("Short-Pro", strategy.short)
+        strategy.exit("TP/SL Short-Pro", from_entry="Short-Pro", profit=fixedPoints, loss=fixedPoints)
+else
+    if (longEntry)
+        strategy.entry("Long", strategy.long)
+    if (shortEntry)
+        strategy.entry("Short", strategy.short)
+    if (longExit)
+        strategy.close("Long")
+    if (shortExit)
+        strategy.close("Short")
+
+// === Plotting EMAs ===
+plot(ema5_5m,    title="5 EMA (5m)",    color=color.green, linewidth=2)
+plot(ema8_15m,   title="8 EMA (15m)",   color=color.blue, linewidth=2)
+plot(ema21_30m,  title="21 EMA (30m)",  color=color.red, linewidth=2)
+
+// === Entry Markers
+plotshape(longEntry,  title="Long Entry",  location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(shortEntry, title="Short Entry", location=location.abovebar, color=color.red,   style=shape.triangledown, size=size.small)
+
+// === Mini Dashboard ===
+var table dash = table.new(position=position.bottom_right, columns=2, rows=4, border_width=1)
+
+entryType = strategy.position_size > 0 ? "Long" : strategy.position_size < 0 ? "Short" : "None"
+avgPrice  = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.entry_price(0), format.mintick) : "—"
+openPnL   = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.profit(0), format.mintick) : "—"
+
+table.cell(dash, 0, 0, "MODE", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 0, mode, text_color=color.white)
+table.cell(dash, 0, 1, "Entry Type", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 1, entryType, text_color=color.white)
+table.cell(dash, 0, 2, "Avg Price", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 2, avgPrice, text_color=color.white)
+table.cell(dash, 0, 3, "Open PnL", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 3, openPnL, text_color=color.white)
