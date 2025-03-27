@@ -1,0 +1,68 @@
+//@version=5
+strategy("John Carter MTF EMA Strategy (Trend + Counter Trend)", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === INPUTS ===
+ema21_tf = "30"
+ema8_15m_tf = "15"
+ema5_5m_tf = "5"
+
+takeProfitTicks = input.int(30, title="Fixed Take Profit (Ticks)", minval=1)
+stopLossTicks = input.int(15, title="Fixed Stop Loss (Ticks)", minval=1)
+tickSize = syminfo.mintick
+takeProfitPoints = takeProfitTicks * tickSize
+stopLossPoints = stopLossTicks * tickSize
+
+// === MTF EMAs ===
+ema21_30m = request.security(syminfo.tickerid, ema21_tf, ta.ema(close, 21), lookahead=barmerge.lookahead_on)
+ema8_15m  = request.security(syminfo.tickerid, ema8_15m_tf, ta.ema(close, 8), lookahead=barmerge.lookahead_on)
+ema5_5m   = request.security(syminfo.tickerid, ema5_5m_tf, ta.ema(close, 5), lookahead=barmerge.lookahead_on)
+
+// === PLOTS ===
+plot(ema21_30m, title="21 EMA (30m)", color=color.red, linewidth=2)
+plot(ema8_15m,  title="8 EMA (15m)",  color=color.blue, linewidth=2)
+plot(ema5_5m,   title="5 EMA (5m)",   color=color.green, linewidth=2)
+
+// === Entry Conditions ===
+trendLong = ema5_5m > ema21_30m and ema8_15m > ema21_30m
+trendShort = ema5_5m < ema21_30m and ema8_15m < ema21_30m
+
+counterLong = ema5_5m > ema21_30m and ema8_15m < ema21_30m
+counterShort = ema5_5m < ema21_30m and ema8_15m > ema21_30m
+
+// === Exit Conditions for Trend Trades (Trailing EMA) ===
+exitLongTrend = close < ema21_30m
+exitShortTrend = close > ema21_30m
+
+// === Strategy Logic ===
+
+// Trend-Following Long
+if (trendLong and strategy.position_size == 0)
+    strategy.entry("Long-Trend", strategy.long)
+
+// Trend-Following Exit
+if (strategy.position_size > 0 and strategy.opentrades.entry_id(0) == "Long-Trend" and exitLongTrend)
+    strategy.close("Long-Trend")
+
+// Trend-Following Short
+if (trendShort and strategy.position_size == 0)
+    strategy.entry("Short-Trend", strategy.short)
+
+// Trend-Following Exit
+if (strategy.position_size < 0 and strategy.opentrades.entry_id(0) == "Short-Trend" and exitShortTrend)
+    strategy.close("Short-Trend")
+
+// Counter-Trend Long
+if (counterLong and strategy.position_size == 0)
+    strategy.entry("Long-Counter", strategy.long)
+    strategy.exit("Exit-CounterLong", from_entry="Long-Counter", profit=takeProfitPoints, loss=stopLossPoints)
+
+// Counter-Trend Short
+if (counterShort and strategy.position_size == 0)
+    strategy.entry("Short-Counter", strategy.short)
+    strategy.exit("Exit-CounterShort", from_entry="Short-Counter", profit=takeProfitPoints, loss=stopLossPoints)
+
+// === Plot Entry Markers ===
+plotshape(trendLong, title="Trend Long", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(trendShort, title="Trend Short", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)
+plotshape(counterLong, title="Counter Long", location=location.belowbar, color=color.teal, style=shape.circle, size=size.tiny)
+plotshape(counterShort, title="Counter Short", location=location.abovebar, color=color.maroon, style=shape.circle, size=size.tiny)
