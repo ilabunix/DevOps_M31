@@ -1,0 +1,40 @@
+//@version=5
+strategy("Simple EMA Crossover Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === Timeframes
+tf_5m = "5"
+tf_15m = "15"
+
+// === EMAs
+ema5_5m = request.security(syminfo.tickerid, tf_5m, ta.ema(close, 5), lookahead=barmerge.lookahead_on)
+ema8_15m = request.security(syminfo.tickerid, tf_15m, ta.ema(close, 8), lookahead=barmerge.lookahead_on)
+
+// === Optional trend filter
+ema21_30m = request.security(syminfo.tickerid, "30", ta.ema(close, 21), lookahead=barmerge.lookahead_on)
+plot(ema21_30m, title="Trend EMA (30m)", color=color.red, linewidth=1)
+
+// === Entry Conditions
+longCondition = ta.crossover(ema5_5m, ema8_15m)
+shortCondition = ta.crossunder(ema5_5m, ema8_15m)
+
+// === Exit on opposite crossover
+exitLong = ta.crossunder(ema5_5m, ema8_15m)
+exitShort = ta.crossover(ema5_5m, ema8_15m)
+
+// === Entries
+if (longCondition)
+    strategy.entry("Long", strategy.long)
+
+if (shortCondition)
+    strategy.entry("Short", strategy.short)
+
+// === Exits
+if (exitLong)
+    strategy.close("Long")
+
+if (exitShort)
+    strategy.close("Short")
+
+// === Plotting
+plot(ema5_5m, title="5 EMA (5m)", color=color.green)
+plot(ema8_15m, title="8 EMA (15m)", color=color.blue)
