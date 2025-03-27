@@ -1,0 +1,56 @@
+//@version=5
+strategy("Clean 15m vs 30m EMA Crossover + 5 EMA + Dashboard", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === Timeframes
+tf_5m = "5"
+tf_15m = "15"
+tf_30m = "30"
+
+// === EMAs
+ema5_5m    = request.security(syminfo.tickerid, tf_5m, ta.ema(close, 5), lookahead=barmerge.lookahead_on)
+ema8_15m   = request.security(syminfo.tickerid, tf_15m, ta.ema(close, 8), lookahead=barmerge.lookahead_on)
+ema21_30m  = request.security(syminfo.tickerid, tf_30m, ta.ema(close, 21), lookahead=barmerge.lookahead_on)
+
+// === Plot EMAs
+plot(ema5_5m,    title="5 EMA (5m)",    color=color.green, linewidth=2)
+plot(ema8_15m,   title="8 EMA (15m)",   color=color.blue, linewidth=2)
+plot(ema21_30m,  title="21 EMA (30m)",  color=color.red, linewidth=2)
+
+// === Entry / Exit Conditions (crossovers only)
+longEntry  = ta.crossover(ema8_15m, ema21_30m)
+shortEntry = ta.crossunder(ema8_15m, ema21_30m)
+
+longExit   = shortEntry
+shortExit  = longEntry
+
+// === Strategy Entries
+if (longEntry)
+    strategy.entry("Long", strategy.long)
+if (shortEntry)
+    strategy.entry("Short", strategy.short)
+
+// === Strategy Exits
+if (longExit)
+    strategy.close("Long")
+if (shortExit)
+    strategy.close("Short")
+
+// === Plot Buy/Sell Markers
+plotshape(longEntry,  title="Long Entry",  location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(shortEntry, title="Short Entry", location=location.abovebar, color=color.red,   style=shape.triangledown, size=size.small)
+
+// === Mini Dashboard Table ===
+var table miniDash = table.new(position=position.bottom_right, columns=2, rows=3, border_width=1)
+
+entryType = strategy.position_size > 0 ? "Long" : strategy.position_size < 0 ? "Short" : "None"
+avgPrice  = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.entry_price(0), format.mintick) : "—"
+openPnL   = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.profit(0), format.mintick) : "—"
+
+table.cell(miniDash, 0, 0, "Entry Type", bgcolor=color.gray, text_color=color.white)
+table.cell(miniDash, 1, 0, entryType, text_color=color.white)
+
+table.cell(miniDash, 0, 1, "Avg Price", bgcolor=color.gray, text_color=color.white)
+table.cell(miniDash, 1, 1, avgPrice, text_color=color.white)
+
+table.cell(miniDash, 0, 2, "Open PnL", bgcolor=color.gray, text_color=color.white)
+table.cell(miniDash, 1, 2, openPnL, text_color=color.white)
