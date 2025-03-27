@@ -1,0 +1,73 @@
+//@version=5
+strategy("10/55 EMA Crossover - With Slope & Volume Filters", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === MODE SELECTION ===
+mode = input.string("Intraday", title="Strategy Mode", options=["Intraday", "Scalping"])
+
+// === INPUTS ===
+emaFastLen = input.int(10, title="Fast EMA (10)")
+emaSlowLen = input.int(55, title="Slow EMA (55)")
+tp_pts     = input.float(25.0, title="Take Profit (Points)", step=0.25)
+sl_pts     = input.float(25.0, title="Stop Loss (Points)", step=0.25)
+
+// === EMAs
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+
+// === SLOPE & VOLUME FILTERS
+slopeUp   = emaFast > emaFast[1]
+slopeDown = emaFast < emaFast[1]
+volumeOK  = volume > ta.sma(volume, 20)
+
+// === ENTRY CONDITIONS (with filters)
+longEntry  = ta.crossover(emaFast, emaSlow) and slopeUp and volumeOK
+shortEntry = ta.crossunder(emaFast, emaSlow) and slopeDown and volumeOK
+longExit   = shortEntry
+shortExit  = longEntry
+
+// === STRATEGY EXECUTION
+if (mode == "Scalping")
+    if (longEntry)
+        strategy.entry("Long-Scalp", strategy.long)
+        strategy.exit("TP/SL Long", from_entry="Long-Scalp", profit=tp_pts, loss=sl_pts)
+
+    if (shortEntry)
+        strategy.entry("Short-Scalp", strategy.short)
+        strategy.exit("TP/SL Short", from_entry="Short-Scalp", profit=tp_pts, loss=sl_pts)
+else
+    if (longEntry)
+        strategy.entry("Long", strategy.long)
+    if (shortEntry)
+        strategy.entry("Short", strategy.short)
+    if (longExit)
+        strategy.close("Long")
+    if (shortExit)
+        strategy.close("Short")
+
+// === PLOT EMAs
+plot(emaFast, title="10 EMA", color=color.orange, linewidth=2)
+plot(emaSlow, title="55 EMA", color=color.purple, linewidth=2)
+
+// === ENTRY MARKERS
+plotshape(longEntry, title="Long Entry", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(shortEntry, title="Short Entry", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)
+
+// === DASHBOARD
+var table dash = table.new(position=position.bottom_right, columns=2, rows=5, border_width=1)
+
+entryType = strategy.position_size > 0 ? "Long" : strategy.position_size < 0 ? "Short" : "None"
+avgPrice  = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.entry_price(0), format.mintick) : "—"
+openPnL   = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.profit(0), format.mintick) : "—"
+tpInfo    = mode == "Scalping" ? str.tostring(tp_pts) : "—"
+slInfo    = mode == "Scalping" ? str.tostring(sl_pts) : "—"
+
+table.cell(dash, 0, 0, "MODE", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 0, mode, text_color=color.white)
+table.cell(dash, 0, 1, "Entry Type", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 1, entryType, text_color=color.white)
+table.cell(dash, 0, 2, "Avg Price", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 2, avgPrice, text_color=color.white)
+table.cell(dash, 0, 3, "Open PnL", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 3, openPnL, text_color=color.white)
+table.cell(dash, 0, 4, "TP / SL", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 4, tpInfo + " / " + slInfo, text_color=color.white)
