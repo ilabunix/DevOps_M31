@@ -1,0 +1,96 @@
+//@version=5
+strategy("EMAX Multi-Mode Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// === STRATEGY MODE SELECTION ===
+mode = input.string(defval="Intraday", title="Strategy Mode", options=["Intraday", "Scalping", "Scalping Pro"])
+scalpEntryType = input.string(defval="Fast", title="Scalping Entry Type", options=["Fast", "Slow"])
+
+// === EMA LENGTH INPUTS ===
+ema10_len   = input.int(10, title="10 EMA Length (Current TF)")
+ema8_len    = input.int(8, title="8 EMA Length (HTFs)")
+ema21_len   = input.int(21, title="21 EMA Length (30m)")
+
+// === TP/SL INPUTS FOR SCALPING PRO ===
+tp_ticks = input.int(100, title="Take Profit (Points)")
+sl_ticks = input.int(100, title="Stop Loss (Points)")
+tp_points = tp_ticks
+sl_points = sl_ticks
+
+// === REPAINTING TOGGLE ===
+confirmHTFCandleClose = input.bool(true, title="Confirm HTF Candle Close (Avoid Repainting)")
+lookaheadMode = confirmHTFCandleClose ? barmerge.lookahead_off : barmerge.lookahead_on
+
+// === TIMEFRAMES ===
+tf_5m = "5"
+tf_15m = "15"
+tf_30m = "30"
+
+// === MTF EMAs ===
+ema10_current = ta.ema(close, ema10_len)
+ema8_5m       = request.security(syminfo.tickerid, tf_5m, ta.ema(close, ema8_len), lookahead=lookaheadMode)
+ema8_15m      = request.security(syminfo.tickerid, tf_15m, ta.ema(close, ema8_len), lookahead=lookaheadMode)
+ema21_30m     = request.security(syminfo.tickerid, tf_30m, ta.ema(close, ema21_len), lookahead=lookaheadMode)
+
+// === Select EMAs based on mode
+emaFast = mode == "Intraday" ? ema8_15m : ema10_current
+emaSlow = mode == "Intraday" ? ema21_30m :
+           (scalpEntryType == "Fast" ? ema8_5m : ema8_15m)
+
+// === ENTRY + EXIT CONDITIONS
+longEntry  = ta.crossover(emaFast, emaSlow)
+shortEntry = ta.crossunder(emaFast, emaSlow)
+longExit   = shortEntry
+shortExit  = longEntry
+
+// === STRATEGY EXECUTION ===
+if (mode == "Scalping Pro")
+    if (longEntry)
+        strategy.entry("Long-Pro", strategy.long)
+        strategy.exit("TP/SL Long-Pro", from_entry="Long-Pro", profit=tp_points, loss=sl_points)
+    if (shortEntry)
+        strategy.entry("Short-Pro", strategy.short)
+        strategy.exit("TP/SL Short-Pro", from_entry="Short-Pro", profit=tp_points, loss=sl_points)
+else
+    if (longEntry)
+        strategy.entry("Long", strategy.long)
+    if (shortEntry)
+        strategy.entry("Short", strategy.short)
+    if (longExit)
+        strategy.close("Long")
+    if (shortExit)
+        strategy.close("Short")
+
+// === PLOTS ===
+plot(ema10_current, title="10 EMA (Current)", color=color.orange, linewidth=2)
+plot(ema8_5m,       title="8 EMA (5m)",      color=color.green, linewidth=2)
+plot(ema8_15m,      title="8 EMA (15m)",     color=color.blue, linewidth=2)
+plot(ema21_30m,     title="21 EMA (30m)",    color=color.red, linewidth=2)
+
+// === ENTRY MARKERS
+plotshape(longEntry,  title="Long Entry",  location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape(shortEntry, title="Short Entry", location=location.abovebar, color=color.red,   style=shape.triangledown, size=size.small)
+
+// === MINI DASHBOARD ===
+var table dash = table.new(position=position.bottom_right, columns=2, rows=7, border_width=1)
+
+entryType   = strategy.position_size > 0 ? "Long" : strategy.position_size < 0 ? "Short" : "None"
+avgPrice    = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.entry_price(0), format.mintick) : "—"
+openPnL     = strategy.opentrades > 0 ? str.tostring(strategy.opentrades.profit(0), format.mintick) : "—"
+tpInfo      = mode == "Scalping Pro" ? str.tostring(tp_points) : "—"
+slInfo      = mode == "Scalping Pro" ? str.tostring(sl_points) : "—"
+repaintInfo = confirmHTFCandleClose ? "OFF (Safe)" : "ON (Faster)"
+
+table.cell(dash, 0, 0, "MODE", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 0, mode, text_color=color.white)
+table.cell(dash, 0, 1, "Scalp Type", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 1, mode == "Intraday" ? "—" : scalpEntryType, text_color=color.white)
+table.cell(dash, 0, 2, "Entry Type", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 2, entryType, text_color=color.white)
+table.cell(dash, 0, 3, "Avg Price", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 3, avgPrice, text_color=color.white)
+table.cell(dash, 0, 4, "Open PnL", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 4, openPnL, text_color=color.white)
+table.cell(dash, 0, 5, "TP / SL (pts)", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 5, tpInfo + " / " + slInfo, text_color=color.white)
+table.cell(dash, 0, 6, "Repainting", bgcolor=color.gray, text_color=color.white)
+table.cell(dash, 1, 6, repaintInfo, text_color=color.white)
