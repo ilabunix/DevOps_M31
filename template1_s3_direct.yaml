@@ -14,9 +14,17 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
-            Action: "kms:*"
+              Service: logs.${AWS::Region}.amazonaws.com
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
             Resource: "*"
+            Condition:
+              ArnLike:
+                kms:EncryptionContext:aws:logs:arn: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*"
       Tags:
         - Key: Project
           Value: CloudOpsAI
@@ -125,6 +133,7 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
         KMSMasterKeyId: !Ref CloudOpsKMSKey
       Tags:
         - Key: Project
@@ -145,10 +154,11 @@ Resources:
     Properties:
       LogGroupName: "/aws/lambda/CloudOpsAI"
       RetentionInDays: 7
-      KmsKeyId: !Ref CloudOpsKMSKey
+      KmsKeyId: !GetAtt CloudOpsKMSKey.Arn
       Tags:
         - Key: Project
           Value: CloudOpsAI
+    DependsOn: CloudOpsKMSKey
 
   # 🔹 IAM Role for Kendra Index Access
   KendraIndexRole:
@@ -178,6 +188,7 @@ Resources:
                 Action:
                   - "kms:Decrypt"
                 Resource: "*"
+    DependsOn: CloudOpsKMSKey            
 
   # 🔹 Amazon Kendra Index
   KendraIndex:
