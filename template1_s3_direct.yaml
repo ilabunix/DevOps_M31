@@ -262,8 +262,8 @@ Resources:
       BotId: !Ref CloudOpsLexBot
       BotAliasName: "TestAlias"
       BotAliasLocaleSettings:
-        - BotAliasLocaleSetting:
-            LocaleId: en_US
+        - LocaleId: en_US
+          BotAliasLocaleSetting:
             CodeHookSpecification:
               LambdaCodeHook:
                 CodeHookInterfaceVersion: "1.0"
