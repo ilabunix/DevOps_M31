@@ -1,0 +1,310 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudOps AI Assistant with AWS Bedrock, LangChain, Kendra-enhanced S3 Knowledge Base, and Lex Chatbot"
+
+Resources:
+
+  # 🔹 Customer-Managed KMS Key for Encryption
+  CloudOpsKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "KMS Key for encrypting S3, DynamoDB, Logs, and Kendra"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 IAM Role for Lambda Execution
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudOpsAIExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: CloudOpsAIPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "bedrock:InvokeModel"
+                  - "kms:Decrypt"
+                  - "kendra:Query"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                Resource: !Sub "arn:aws:s3:::${S3KnowledgeBase}/*"
+              - Effect: Allow
+                Action:
+                  - "dynamodb:PutItem"
+                  - "dynamodb:Scan"
+                  - "dynamodb:GetItem"
+                Resource: !GetAtt ChatHistoryTable.Arn
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 AWS Lambda Function for AI Query Processing using Kendra
+  CloudOpsAIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CloudOpsAI
+      Runtime: python3.9
+      Handler: ai_handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          KENDRA_INDEX_ID: !Ref KendraIndex
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+
+          bedrock = boto3.client("bedrock-runtime")
+          kendra = boto3.client("kendra")
+          
+          INDEX_ID = os.environ.get("KENDRA_INDEX_ID")
+
+          def lambda_handler(event, context):
+              query = event.get("query", "").strip()
+              if not query:
+                  return {"response": "Please enter a valid troubleshooting question."}
+
+              # Query Amazon Kendra
+              results = kendra.query(
+                  IndexId=INDEX_ID,
+                  QueryText=query
+              )
+
+              context_data = []
+              for result in results.get("ResultItems", []):
+                  if "DocumentExcerpt" in result:
+                      context_data.append(result["DocumentExcerpt"]["Text"])
+
+              context_text = "\n".join(context_data)
+
+              response = bedrock.invoke_model(
+                  modelId="anthropic.claude-v2",
+                  body=json.dumps({
+                      "prompt": f"Troubleshooting Query: {query}\n\nRelevant Docs:\n{context_text}",
+                      "maxTokens": 500
+                  })
+              )
+              response_json = json.loads(response["body"].read())
+              return {"response": response_json.get("completion", "AI Response Not Available.")}
+
+  # 🔹 DynamoDB Table for Chat History
+  ChatHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CloudOpsChatHistory
+      AttributeDefinitions:
+        - AttributeName: query
+          AttributeType: S
+      KeySchema:
+        - AttributeName: query
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        KMSMasterKeyId: !Ref CloudOpsKMSKey
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 S3 Bucket for Temporary Knowledge Base
+  S3KnowledgeBase:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cloudops-ai-knowledge
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 CloudWatch Log Group for Lambda
+  CloudOpsAILogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "/aws/lambda/CloudOpsAI"
+      RetentionInDays: 7
+      KmsKeyId: !Ref CloudOpsKMSKey
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 IAM Role for Kendra Index Access
+  KendraIndexRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudOpsAIKendraRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: kendra.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: KendraS3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - !Sub "arn:aws:s3:::${S3KnowledgeBase}"
+                  - !Sub "arn:aws:s3:::${S3KnowledgeBase}/*"
+              - Effect: Allow
+                Action:
+                  - "kms:Decrypt"
+                Resource: "*"
+
+  # 🔹 Amazon Kendra Index
+  KendraIndex:
+    Type: AWS::Kendra::Index
+    Properties:
+      Name: CloudOpsAIAssistantIndex
+      Edition: DEVELOPER_EDITION
+      RoleArn: !GetAtt KendraIndexRole.Arn
+      Description: "Kendra Index for CloudOps AI Assistant"
+      ServerSideEncryptionConfiguration:
+        KmsKeyId: !Ref CloudOpsKMSKey
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 Amazon Kendra S3 Data Source
+  KendraS3DataSource:
+    Type: AWS::Kendra::DataSource
+    Properties:
+      IndexId: !Ref KendraIndex
+      Name: CloudOpsAIS3Source
+      Type: S3
+      RoleArn: !GetAtt KendraIndexRole.Arn
+      DataSourceConfiguration:
+        S3Configuration:
+          BucketName: !Ref S3KnowledgeBase
+          InclusionPrefixes:
+            - ""
+      Description: "S3 knowledge base source for CloudOps AI"
+
+  # 🔹 Amazon Lex Bot
+  CloudOpsLexBot:
+    Type: AWS::Lex::Bot
+    Properties:
+      Name: CloudOpsAssistantBot
+      RoleArn: !GetAtt LexBotRole.Arn
+      DataPrivacy:
+        ChildDirected: false
+      IdleSessionTTLInSeconds: 300
+      BotLocales:
+        - LocaleId: en_US
+          Description: "English locale"
+          NluConfidenceThreshold: 0.4
+          Intents:
+            - Name: AskQuestionIntent
+              Description: "Ask a troubleshooting question"
+              SampleUtterances:
+                - "How do I fix a 500 error?"
+                - "Why is my instance unhealthy?"
+                - "What is causing the 403 error?"
+                - "Troubleshooting help"
+              FulfillmentCodeHook:
+                Enabled: true
+      AutoBuildBotLocales: true
+
+  # 🔹 Lex Alias
+  CloudOpsLexBotAlias:
+    Type: AWS::Lex::BotAlias
+    Properties:
+      BotId: !Ref CloudOpsLexBot
+      BotAliasName: "TestAlias"
+      BotAliasLocaleSettings:
+        en_US:
+          Enabled: true
+          CodeHookSpecification:
+            LambdaCodeHook:
+              CodeHookInterfaceVersion: "1.0"
+              LambdaArn: !GetAtt CloudOpsAIFunction.Arn
+      SentimentAnalysisSettings:
+        DetectSentiment: false
+
+  # 🔹 IAM Role for Lex to call Lambda
+  LexBotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudOpsLexBotRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lex.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LexLambdaInvoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt CloudOpsAIFunction.Arn
+
+  # 🔹 Lambda Permission for Lex
+  LexInvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CloudOpsAIFunction
+      Action: lambda:InvokeFunction
+      Principal: lex.amazonaws.com
+      SourceArn: !Sub arn:aws:lex:${AWS::Region}:${AWS::AccountId}:bot-alias/${CloudOpsLexBot}/${CloudOpsLexBotAlias}
+
+Outputs:
+  LambdaFunctionArn:
+    Description: "ARN of the CloudOps AI Lambda function"
+    Value: !GetAtt CloudOpsAIFunction.Arn
+
+  DynamoDBTable:
+    Description: "DynamoDB Table for storing chat history"
+    Value: !Ref ChatHistoryTable
+
+  KnowledgeBaseBucket:
+    Description: "S3 Bucket for storing temporary knowledge base"
+    Value: !Ref S3KnowledgeBase
+
+  KMSKeyArn:
+    Description: "KMS Key ARN for encryption"
+    Value: !Ref CloudOpsKMSKey
+
+  KendraIndexId:
+    Description: "Amazon Kendra Index ID"
+    Value: !Ref KendraIndex
+
+  LexBotId:
+    Description: "Amazon Lex Bot ID"
+    Value: !Ref CloudOpsLexBot
+
+  LexBotAliasId:
+    Description: "Amazon Lex Bot Alias ID"
+    Value: !Ref CloudOpsLexBotAlias
