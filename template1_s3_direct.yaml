@@ -225,10 +225,10 @@ Resources:
             - Name: AskQuestionIntent
               Description: "Ask a troubleshooting question"
               SampleUtterances:
-                - "How do I fix a 500 error?"
-                - "Why is my instance unhealthy?"
-                - "What is causing the 403 error?"
-                - "Troubleshooting help"
+                - Utterance: "How do I fix a 500 error?"
+                - Utterance: "Why is my instance unhealthy?"
+                - Utterance: "What is causing the 403 error?"
+                - Utterance: "Troubleshooting help"
               FulfillmentCodeHook:
                 Enabled: true
       AutoBuildBotLocales: true
