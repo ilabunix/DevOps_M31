@@ -1,0 +1,20 @@
+Resource
+Purpose
+🔐 KMS Key
+Encrypts S3 bucket, DynamoDB, Kendra, and CloudWatch logs.
+🧠 Amazon Kendra Index
+Provides semantic search on S3 documents.
+📁 S3 Bucket (cloudops-ai-knowledge)
+Stores your troubleshooting documents.
+🦾 AWS Lambda Function (CloudOpsAI)
+Main logic to process queries, retrieve context using Kendra, and get AI response via Bedrock (Claude v2).
+💬 Amazon Lex Bot (CloudOpsAssistantBot)
+Chatbot interface where users can ask questions.
+🧭 Lex Bot Alias (TestAlias)
+Deployable version of the Lex bot used for testing or connecting with web UI.
+🧾 IAM Roles
+For Lambda, Lex, and Kendra to access each other and AWS services securely.
+🗂️ DynamoDB Table (CloudOpsChatHistory)
+Stores chat history (future use, not yet active in Lambda).
+📜 CloudWatch Log Group
+Captures logs from Lambda for monitoring/troubleshooting.
