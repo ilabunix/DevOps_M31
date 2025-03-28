@@ -262,12 +262,13 @@ Resources:
       BotId: !Ref CloudOpsLexBot
       BotAliasName: "TestAlias"
       BotAliasLocaleSettings:
-        - LocaleId: en_US
-          Enabled: true
-          CodeHookSpecification:
-            LambdaCodeHook:
-              CodeHookInterfaceVersion: "1.0"
-              LambdaArn: !GetAtt CloudOpsAIFunction.Arn
+        - BotAliasLocaleSetting:
+            LocaleId: en_US
+            CodeHookSpecification:
+              LambdaCodeHook:
+                CodeHookInterfaceVersion: "1.0"
+                LambdaArn: !GetAtt CloudOpsAIFunction.Arn
+            Enabled: true
       SentimentAnalysisSettings:
         DetectSentiment: false
 
