@@ -12,9 +12,17 @@ Resources:
       KeyPolicy:
         Version: "2012-10-17"
         Statement:
-          - Effect: Allow
+          - Sid: AllowRootAccess
+            Effect: Allow
             Principal:
-              Service: logs.${AWS::Region}.amazonaws.com
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+  
+          - Sid: AllowCloudWatchLogs
+            Effect: Allow
+            Principal:
+              Service: logs.amazonaws.com
             Action:
               - kms:Encrypt
               - kms:Decrypt
