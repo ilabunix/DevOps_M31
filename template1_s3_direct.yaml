@@ -223,8 +223,8 @@ Resources:
       DataSourceConfiguration:
         S3Configuration:
           BucketName: !Ref S3KnowledgeBase
-          InclusionPrefixes:
-            - ""
+          #InclusionPrefixes:
+          #  - ""
       Description: "S3 knowledge base source for CloudOps AI"
 
   # 🔹 Amazon Lex Bot
@@ -247,10 +247,13 @@ Resources:
                 - Utterance: "How do I fix a 500 error?"
                 - Utterance: "Why is my instance unhealthy?"
                 - Utterance: "What is causing the 403 error?"
-                - Utterance: "Troubleshooting help"
               FulfillmentCodeHook:
                 Enabled: true
-      AutoBuildBotLocales: true
+            - Name: FallbackIntent
+              Description: "Handles unknown questions"
+              ParentIntentSignature: AMAZON.FallbackIntent
+          VoiceSettings:
+            VoiceId: Joanna
 
   # 🔹 Lex Alias
   CloudOpsLexBotAlias:
