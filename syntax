@@ -1,0 +1,8 @@
+isUpTrend = novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50
+
+AlphaTrend := nz(AlphaTrend[1])  // default to previous value
+
+if isUpTrend
+    AlphaTrend := upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT
+else
+    AlphaTrend := downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
