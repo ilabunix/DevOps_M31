@@ -1,0 +1,109 @@
+//@version=5
+strategy("EMAX Strategy", shorttitle='EMAX', overlay=true, format=format.price, precision=2, margin_long=100, margin_short=100)
+
+// === Mode Selection ===
+mode = input.string("Intraday", title="Mode", options=["Intraday", "Scalping", "Scalping Pro"])
+
+// === Core Inputs ===
+coeff = input.float(1, 'Multiplier', step=0.1)
+AP = input(14, 'Common Period')
+src = input(close)
+showsignalsk = input.bool(title='Show Signals?', defval=false)
+novolumedata = input.bool(title='Change calculation (no volume data)?', defval=false)
+
+// === TP/SL Inputs ===
+tpPointsFixed = input.int(100, "Fixed TP (points, for Scalping Pro)", minval=1)
+slPointsFixed = input.int(100, "Fixed SL (points, for Scalping Pro)", minval=1)
+tpPerc = input.float(1.0, "Take Profit % (for Scalping)", step=0.1)
+slPerc = input.float(0.5, "Stop Loss % (for Scalping)", step=0.1)
+
+// === AlphaTrend Logic ===
+ATR = ta.sma(ta.tr, AP)
+upT = low - ATR * coeff
+downT = high + ATR * coeff
+AlphaTrend = 0.0
+AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? 
+    (upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT) :
+    (downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT)
+
+color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+plot_k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
+plot_k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
+fill(plot_k1, plot_k2, color=color1)
+
+// === Signal Logic ===
+buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
+sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
+
+K1 = ta.barssince(buySignalk)
+K2 = ta.barssince(sellSignalk)
+O1 = ta.barssince(buySignalk[1])
+O2 = ta.barssince(sellSignalk[1])
+
+validBuy = buySignalk and O1 > K2
+validSell = sellSignalk and O2 > K1
+
+plotshape(validBuy and showsignalsk ? AlphaTrend[2] * 0.9999 : na, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.white)
+plotshape(validSell and showsignalsk ? AlphaTrend[2] * 1.0001 : na, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.maroon, textcolor=color.white)
+
+// === TP/SL Logic Based on Mode ===
+useTP_SL = mode != "Intraday"
+usePercentageMode = mode == "Scalping"
+
+longTP  = usePercentageMode ? close * (1 + tpPerc / 100) : close + tpPointsFixed * syminfo.mintick
+longSL  = usePercentageMode ? close * (1 - slPerc / 100) : close - slPointsFixed * syminfo.mintick
+shortTP = usePercentageMode ? close * (1 - tpPerc / 100) : close - tpPointsFixed * syminfo.mintick
+shortSL = usePercentageMode ? close * (1 + slPerc / 100) : close + slPointsFixed * syminfo.mintick
+
+// === Strategy Entry ===
+if (validBuy)
+    if useTP_SL
+        strategy.entry("Long", strategy.long, stop=longSL, limit=longTP)
+    else
+        strategy.entry("Long", strategy.long)
+
+if (validSell)
+    if useTP_SL
+        strategy.entry("Short", strategy.short, stop=shortSL, limit=shortTP)
+    else
+        strategy.entry("Short", strategy.short)
+
+// === Dashboard ===
+var label dash = na
+var string lastSignal = "None"
+if (validBuy)
+    lastSignal := "Buy"
+else if (validSell)
+    lastSignal := "Sell"
+
+positionState = strategy.position_size > 0 ? "Long" : strategy.position_size < 0 ? "Short" : "Flat"
+avgPrice = strategy.position_avg_price
+pnl = strategy.openprofit
+
+// TP/SL Price for Current Position
+tpPrice = na
+slPrice = na
+if strategy.position_size > 0
+    tpPrice := usePercentageMode ? avgPrice * (1 + tpPerc / 100) : avgPrice + tpPointsFixed * syminfo.mintick
+    slPrice := usePercentageMode ? avgPrice * (1 - slPerc / 100) : avgPrice - slPointsFixed * syminfo.mintick
+else if strategy.position_size < 0
+    tpPrice := usePercentageMode ? avgPrice * (1 - tpPerc / 100) : avgPrice - tpPointsFixed * syminfo.mintick
+    slPrice := usePercentageMode ? avgPrice * (1 + slPerc / 100) : avgPrice + slPointsFixed * syminfo.mintick
+
+dashboardText =
+    "EMAX Strategy Dashboard\n" +
+    "Mode: " + mode + "\n" +
+    "Status: " + positionState + "\n" +
+    "Last Signal: " + lastSignal + "\n" +
+    "AlphaTrend: " + str.tostring(AlphaTrend, "#.##") + "\n" +
+    "Avg Price: " + (avgPrice != 0 ? str.tostring(avgPrice, "#.##") : "n/a") + "\n" +
+    "Open PnL: " + str.tostring(pnl, "#.##") + "\n" +
+    "TP Price: " + (tpPrice != na ? str.tostring(tpPrice, "#.##") : "n/a") + "\n" +
+    "SL Price: " + (slPrice != na ? str.tostring(slPrice, "#.##") : "n/a")
+
+if (na(dash))
+    dash := label.new(x=bar_index, y=high, text=dashboardText, style=label.style_label_left,
+                      textcolor=color.white, size=size.small, color=color.new(color.gray, 80))
+else
+    label.set_xy(dash, bar_index, high)
+    label.set_text(dash, dashboardText)
