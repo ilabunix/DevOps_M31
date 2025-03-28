@@ -1,0 +1,68 @@
+import os
+import json
+import boto3
+from langchain.document_loaders import S3FileLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# AWS clients
+bedrock = boto3.client("bedrock-runtime")
+kendra = boto3.client("kendra")
+
+def lambda_handler(event, context):
+    query = event.get("query", "").strip()
+    if not query:
+        return {"response": "Please enter a valid troubleshooting question."}
+
+    # ENV values
+    INDEX_ID = os.environ.get("KENDRA_INDEX_ID")
+    S3_BUCKET = os.environ.get("S3_KNOWLEDGE_BUCKET")
+
+    # 🔍 Kendra context retrieval
+    kendra_context = []
+    try:
+        kendra_results = kendra.query(IndexId=INDEX_ID, QueryText=query)
+        for result in kendra_results.get("ResultItems", []):
+            if "DocumentExcerpt" in result:
+                kendra_context.append(result["DocumentExcerpt"]["Text"])
+    except Exception as e:
+        print("[ERROR] Kendra query failed:", e)
+
+    # 📄 LangChain S3 document retrieval
+    langchain_context = []
+    try:
+        loader = S3FileLoader(bucket=S3_BUCKET)
+        documents = loader.load()
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        chunks = splitter.split_documents(documents)
+
+        # Simple filtering: keyword presence
+        langchain_context = [
+            chunk.page_content for chunk in chunks
+            if query.lower() in chunk.page_content.lower()
+        ]
+    except Exception as e:
+        print("[ERROR] LangChain loading failed:", e)
+
+    # 🧠 Combine top chunks from both
+    combined_context = kendra_context[:3] + langchain_context[:3]
+    context_text = "\n".join(combined_context)
+
+    if not context_text:
+        return {"response": "No relevant documents were found for this query."}
+
+    # 🤖 Claude via Bedrock
+    prompt = f"""Troubleshooting Query: {query}\n\nRelevant Docs:\n{context_text}"""
+
+    try:
+        response = bedrock.invoke_model(
+            modelId="anthropic.claude-v2",
+            body=json.dumps({
+                "prompt": prompt,
+                "maxTokens": 500
+            })
+        )
+        response_json = json.loads(response["body"].read())
+        return {"response": response_json.get("completion", "AI Response Not Available.")}
+    except Exception as e:
+        print("[ERROR] Bedrock call failed:", e)
+        return {"response": "An error occurred while processing your request with Claude."}
