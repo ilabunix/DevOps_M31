@@ -1,0 +1,17 @@
+// === COLOR-AWARE DASHBOARD ===
+var table dash = table.new(position.top_right, 1, 3, border_width=1)
+
+// Values
+positionText = strategy.position_size > 0 ? "Long" : strategy.position_size < 0 ? "Short" : "Flat"
+avgEntryText = str.tostring(strategy.position_avg_price, format.mintick)
+pnlValue = strategy.openprofit
+pnlText = str.tostring(pnlValue, format.mintick)
+
+// Dynamic Colors
+posColor = strategy.position_size > 0 ? color.green : strategy.position_size < 0 ? color.red : color.new(color.gray, 20)
+pnlColor = pnlValue > 0 ? color.new(color.green, 10) : pnlValue < 0 ? color.new(color.red, 10) : color.new(color.gray, 20)
+
+// Render cells
+table.cell(dash, 0, 0, "Position: " + positionText, text_color=color.white, bgcolor=posColor)
+table.cell(dash, 0, 1, "Avg Price: " + avgEntryText, text_color=color.white, bgcolor=color.new(color.gray, 20))
+table.cell(dash, 0, 2, "Open PnL: " + pnlText, text_color=color.white, bgcolor=pnlColor)
