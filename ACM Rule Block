@@ -1,0 +1,65 @@
+##############################
+# ACM CERTIFICATE ALERTS
+##############################
+resource "grafana_rule_group" "acm_alerts" {
+  count      = var.certificate_name != null ? 1 : 0
+  name       = "${var.certificate_name} ACM Certificate Alerts"
+  folder_uid = var.folder_uid
+  interval   = "1h"
+
+  dynamic "rule" {
+    for_each = toset(var.acm_expiry_thresholds)
+    content {
+      name = "Cert Expiry < ${rule.value}d - ${var.certificate_name}"
+      condition = "B"
+
+      data {
+        ref_id = "A"
+        relative_time_range { from = 3600 to = 0 }
+        datasource_uid = var.datasource_uid
+        model = jsonencode({
+          region     = var.aws_region,
+          namespace  = "Custom/ACM",
+          metricName = "DaysToExpiry",
+          dimensions = {
+            CertificateName = var.certificate_name
+          },
+          statistic = "Minimum",
+          period    = 3600
+        })
+      }
+
+      data { ref_id = "B" type = "threshold" params = [rule.value] }
+
+      annotations = {
+        summary = "Certificate ${var.certificate_name} expires in <${rule.value} days"
+      }
+
+      labels = {
+        severity = rule.value <= 1 ? "critical" :
+                   rule.value <= 7 ? "high" :
+                   rule.value <= 15 ? "medium" : "info",
+        email    = var.deploy_env
+      }
+
+      no_data_state  = "OK"
+      exec_err_state = "Alerting"
+    }
+  }
+}
+
+
+
+
+
+variable "acm_expiry_thresholds" {
+  type    = list(number)
+  default = [60, 30, 15, 7, 1]
+}
+
+
+
+
+
+
+acm_expiry_thresholds = [45, 20, 10, 5, 1]
