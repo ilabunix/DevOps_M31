@@ -1,0 +1,88 @@
+Application Operational Process – ABCX
+
+Overview
+
+This document outlines the standard operational procedures followed for the ABCX application, specifically covering:
+	•	EC2 instance rehydration
+	•	Operating system patching
+	•	Software/runtime deprecation handling (e.g., AWS Lambda runtimes)
+
+These processes ensure security compliance, minimize technical debt, and maintain supportability across all environments.
+
+⸻
+
+1. EC2 Rehydration Process
+
+Purpose
+
+Rehydration involves replacing existing EC2 instances with new ones built from an updated Amazon Machine Image (AMI) that includes the latest OS patches, security updates, and baseline configurations.
+
+Ownership
+	•	CloudOps Team: Prepares AMIs using the latest gold image provided by NIT.
+	•	DMT Team: Coordinates with CloudOps for scheduling and testing during deployments.
+	•	AppDev Team: Validates functionality post-rehydration.
+
+Process Flow
+	1.	Gold Image Update
+CloudOps takes the latest NIT-provided gold image and prepares a base AMI with necessary configurations for ABCX.
+	2.	AMI Validation
+The prepared AMI is validated in lower environments (Dev/Test) to ensure application compatibility.
+	3.	Coordination with DMT
+CloudOps and DMT coordinate to include rehydration as part of the planned release cycle.
+	4.	Rehydration Execution
+	•	Instances are terminated and replaced using the newly baked AMI.
+	•	Auto Scaling Groups or manual processes are used based on the environment setup.
+	•	Code deployments are integrated with this process to reduce downtime.
+	5.	Post-Rehydration Validation
+	•	Smoke testing and health checks are performed.
+	•	CloudOps ensures monitoring and logging are intact.
+
+⸻
+
+2. Patching Process
+
+Purpose
+
+Ensure OS-level vulnerabilities and dependencies are kept up to date across all EC2-based environments.
+
+Approach
+	•	Patching is bundled as part of the AMI update used during rehydration.
+	•	CloudOps validates that all security advisories from AWS and internal scans are addressed in the new AMI.
+
+⸻
+
+3. Handling Software Deprecation (e.g., AWS Lambda Runtimes)
+
+Purpose
+
+To stay compliant with AWS-supported runtimes and avoid security or availability risks due to deprecated software versions.
+
+Responsibilities
+	•	CloudOps: Tracks deprecation notices from AWS.
+	•	AppDev Team: Tests application compatibility with newer runtime versions in lower environments.
+
+Process Flow
+	1.	Runtime Tracking
+	•	Lambda runtimes are monitored using AWS Trusted Advisor, CLI scripts, and runtime dashboards.
+	2.	Planning for Upgrade
+	•	When AWS announces a deprecation (e.g., Node.js 16), CloudOps flags the application team and plans a timeline.
+	•	The update is scheduled as part of the upcoming release.
+	3.	Lower Environment Testing
+	•	Code is tested with the new runtime version in Dev/Test.
+	•	Any required code changes are included in the next release.
+	4.	Deployment
+	•	Runtime upgrades are deployed along with rehydration and app code updates as part of the regular release cadence.
+
+⸻
+
+4. Release Coordination
+
+All updates related to:
+	•	AMI-based rehydration
+	•	Lambda runtime upgrades
+	•	Code deployments
+
+…are bundled into a single coordinated release per environment to ensure:
+	•	Minimal disruption
+	•	Consistent testing and validation
+	•	Unified rollback strategy (if needed)
