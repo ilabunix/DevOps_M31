@@ -1,0 +1,26 @@
+#!/bin/bash
+
+set -e
+
+# Normalize env
+export deploy_env=$(echo "$TLZ_ACCOUNT_NAME" | tr '[:upper:]' '[:lower:]')
+
+# Build secret name
+export secretName="/adt/frfs/cmcv2/${deploy_env}/grafana-api-token"
+echo "Secret name: $secretName"
+
+# Fetch secret
+export TF_VAR_grafana_auth=$(aws secretsmanager get-secret-value --secret-id "$secretName" --query 'SecretString' --output text)
+
+# Set Grafana URL
+if [[ "$deploy_env" == "prod" ]]; then
+  export TF_VAR_grafana_url="https://grafana.logging.awscfs.frb.pvt"
+  export GRAFANA_ENV="prod"
+else
+  export TF_VAR_grafana_url="https://grafana.logging-nonprod.logging.awscfs.frb.pvt"
+  export GRAFANA_ENV="nonprod"
+fi
+
+# Set path to tfvars and copy
+export TFVARS_FILE="iac/environments/${deploy_env}/us-gov-east-1/input.tfvars"
+cp "$TFVARS_FILE" iac/terraform.tfvars
