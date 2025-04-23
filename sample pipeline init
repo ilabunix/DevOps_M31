@@ -1,0 +1,14 @@
+before_script:
+  # Normalize environment
+  - export deploy_env=$(echo "$TLZ_ACCOUNT_NAME" | tr '[:upper:]' '[:lower:]')
+
+  # Set Grafana URL based on environment
+  - |
+    if [[ "$deploy_env" == "prod" ]]; then
+      export TF_VAR_grafana_url="https://grafana.prod.example.com"
+    else
+      export TF_VAR_grafana_url="https://grafana.nonprod.example.com"
+    fi
+
+  # (Optional) Show what was set — safe for debugging
+  - echo "Using Grafana URL: $TF_VAR_grafana_url"
