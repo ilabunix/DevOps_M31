@@ -1,0 +1,242 @@
+
+resource "grafana_rule_group" "lambda_alerts" {
+  name             = "Lambda Alerts"
+  folder_uid       = var.terraform_folder_uid
+  interval_seconds = 300
+
+  # Lambda Errors
+  rule {
+    name      = "Lambda Errors - ${var.lambda_name}"
+    condition = "B"
+
+    data {
+      ref_id = "A"
+      relative_time_range { from = 300 to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Errors",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [1], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["A"] },
+          reducer   = { type = "last" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels         = { severity = "critical", email = var.deploy_env }
+    annotations    = { summary = "Lambda ${var.lambda_name} is throwing errors." }
+  }
+
+  # Lambda Throttles
+  rule {
+    name      = "Lambda Throttles - ${var.lambda_name}"
+    condition = "B"
+
+    data {
+      ref_id = "A"
+      relative_time_range { from = 300 to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Throttles",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [1], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["A"] },
+          reducer   = { type = "last" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels         = { severity = "critical", email = var.deploy_env }
+    annotations    = { summary = "Lambda ${var.lambda_name} is being throttled." }
+  }
+
+  # Lambda Duration
+  rule {
+    name      = "Lambda Duration - ${var.lambda_name}"
+    condition = "B"
+
+    data {
+      ref_id = "A"
+      relative_time_range { from = 300 to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Duration",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Average",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [var.lambda_duration_threshold], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["A"] },
+          reducer   = { type = "avg" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels         = { severity = "high", email = var.deploy_env }
+    annotations    = { summary = "Lambda ${var.lambda_name} duration is high." }
+  }
+
+  # Lambda Invocations
+  rule {
+    name      = "Lambda Invocations - ${var.lambda_name}"
+    condition = "B"
+
+    data {
+      ref_id = "A"
+      relative_time_range { from = 300 to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Invocations",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [var.lambda_invocation_threshold], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["A"] },
+          reducer   = { type = "sum" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels         = { severity = "medium", email = var.deploy_env }
+    annotations    = { summary = "Spike in invocations for Lambda ${var.lambda_name}" }
+  }
+}
+
+
+
+
+
+
+###############################################
+✅ 1. alerts/variables.tf (inside the alerts module)
+h
+Copy
+Edit
+variable "lambda_name" {
+  type        = string
+  description = "Name of the Lambda function"
+}
+
+variable "terraform_folder_uid" {
+  type        = string
+  description = "Grafana folder UID to group alert rules"
+}
+
+variable "cloudwatch_data_source_uid" {
+  type        = string
+  description = "Grafana UID of the CloudWatch data source"
+}
+
+variable "aws_region" {
+  type        = string
+  description = "AWS region where Lambda function is running"
+}
+
+variable "deploy_env" {
+  type        = string
+  description = "Environment label for routing alerts (e.g., dev/test/prod)"
+}
+
+variable "lambda_duration_threshold" {
+  type        = number
+  description = "Duration threshold in milliseconds"
+  default     = 1000
+}
+
+variable "lambda_invocation_threshold" {
+  type        = number
+  description = "Invocation spike threshold"
+  default     = 100
+}
+✅ 2. Root input.tfvars (for dev/test/prod)
+hcl
+Copy
+Edit
+lambda_name                   = "adt-lambda-api-handler"
+terraform_folder_uid          = "lambda-alerts-folder"
+cloudwatch_data_source_uid    = "cloudwatch"
+aws_region                    = "us-gov-west-1"
+deploy_env                    = "dev"
+lambda_duration_threshold     = 1000
+lambda_invocation_threshold   = 100
+✅ 3. Root variables.tf (to pass variables to module)
+If you're using a module block like:
+
+hcl
+Copy
+Edit
+module "lambda_alerts" {
+  source = "../modules/alerts"
+  ...
+}
+Then define in your root-level variables.tf:
+
+hcl
+Copy
+Edit
+variable "lambda_name" {}
+variable "terraform_folder_uid" {}
+variable "cloudwatch_data_source_uid" {}
+variable "aws_region" {}
+variable "deploy_env" {}
+variable "lambda_duration_threshold" {}
+variable "lambda_invocation_threshold" {}
