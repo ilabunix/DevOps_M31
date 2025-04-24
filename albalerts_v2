@@ -1,0 +1,205 @@
+resource "grafana_rule_group" "alb_alerts" {
+  name         = "${var.alb_name} ALB Alerts"
+  folder_uid   = var.terraform_folder_uid
+  interval_seconds = 60
+
+  rule {
+    name      = "ALB ELB 5XX Errors - ${var.alb_name}"
+    condition = "B"
+
+    data {
+      ref_id             = "A"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid     = var.cloudwatch_data_source_uid
+      model              = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/ApplicationELB",
+        metricName = "HTTPCode_ELB_5XX_Count",
+        dimensions = {
+          LoadBalancer = var.alb_name
+        },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [10], type = "gt" }
+          operator  = { type = "and" }
+          query     = { params = ["A"] }
+          reducer   = { type = "last" }
+          type      = "query"
+        }]
+      })
+    }
+
+    labels = {
+      severity = "critical"
+    }
+
+    annotations = {
+      summary = "ALB ${var.alb_name} has ELB 5XX errors"
+    }
+
+    no_data_state   = "OK"
+    exec_err_state  = "Alerting"
+  }
+
+  rule {
+    name      = "ALB Target 5XX Errors - ${var.alb_name}"
+    condition = "B"
+
+    data {
+      ref_id             = "A"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid     = var.cloudwatch_data_source_uid
+      model              = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/ApplicationELB",
+        metricName = "HTTPCode_Target_5XX_Count",
+        dimensions = {
+          LoadBalancer = var.alb_name
+        },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [10], type = "gt" }
+          operator  = { type = "and" }
+          query     = { params = ["A"] }
+          reducer   = { type = "last" }
+          type      = "query"
+        }]
+      })
+    }
+
+    labels = {
+      severity = "critical"
+    }
+
+    annotations = {
+      summary = "ALB ${var.alb_name} has Target 5XX errors"
+    }
+
+    no_data_state   = "OK"
+    exec_err_state  = "Alerting"
+  }
+
+  rule {
+    name      = "ALB Target Response Time - ${var.alb_name}"
+    condition = "B"
+
+    data {
+      ref_id             = "A"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid     = var.cloudwatch_data_source_uid
+      model              = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/ApplicationELB",
+        metricName = "TargetResponseTime",
+        dimensions = {
+          LoadBalancer = var.alb_name
+        },
+        statistic  = "Average",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [1.0], type = "gt" }
+          operator  = { type = "and" }
+          query     = { params = ["A"] }
+          reducer   = { type = "last" }
+          type      = "query"
+        }]
+      })
+    }
+
+    labels = {
+      severity = "high"
+    }
+
+    annotations = {
+      summary = "Target response time is > 1s on ALB ${var.alb_name}"
+    }
+
+    no_data_state   = "OK"
+    exec_err_state  = "Alerting"
+  }
+
+  rule {
+    name      = "TLS Negotiation Errors - ${var.alb_name}"
+    condition = "B"
+
+    data {
+      ref_id             = "A"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid     = var.cloudwatch_data_source_uid
+      model              = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/ApplicationELB",
+        metricName = "TLSNegotiationErrorCount",
+        dimensions = {
+          LoadBalancer = var.alb_name
+        },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id         = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [var.alb_tls_error_threshold], type = "gt" }
+          operator  = { type = "and" }
+          query     = { params = ["A"] }
+          reducer   = { type = "last" }
+          type      = "query"
+        }]
+      })
+    }
+
+    labels = {
+      severity = "critical"
+    }
+
+    annotations = {
+      summary = "High TLS negotiation errors on ALB ${var.alb_name}"
+    }
+
+    no_data_state   = "OK"
+    exec_err_state  = "Alerting"
+  }
+}
+
+
+
+###########################
