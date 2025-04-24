@@ -1,0 +1,196 @@
+
+resource "grafana_rule_group" "lambda_alerts" {
+  name             = "Lambda Alerts - ${var.lambda_name}"
+  folder_uid       = var.terraform_folder_uid
+  interval_seconds = 300
+
+  # Lambda Errors
+  rule {
+    name      = "Lambda Errors - ${var.lambda_name}"
+    condition = "B"
+
+    data {
+      ref_id = "A"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Errors",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id = "B"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [1], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["A"] },
+          reducer   = { type = "last" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+    annotations = {
+      summary = "Lambda ${var.lambda_name} is throwing errors."
+    }
+  }
+
+  # Lambda Throttles
+  rule {
+    name      = "Lambda Throttles - ${var.lambda_name}"
+    condition = "D"
+
+    data {
+      ref_id = "C"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Throttles",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id = "D"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [1], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["C"] },
+          reducer   = { type = "last" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+    annotations = {
+      summary = "Lambda ${var.lambda_name} is being throttled."
+    }
+  }
+}
+
+
+  # Lambda Duration
+  rule {
+    name      = "Lambda Duration - ${var.lambda_name}"
+    condition = "F"
+
+    data {
+      ref_id = "E"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Duration",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Average",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id = "F"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [var.duration_threshold], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["E"] },
+          reducer   = { type = "avg" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels = {
+      severity = "high"
+      email    = var.deploy_env
+    }
+    annotations = {
+      summary = "Lambda ${var.lambda_name} average duration is high."
+    }
+  }
+
+  # Lambda Invocation Spike
+  rule {
+    name      = "Lambda Invocations - ${var.lambda_name}"
+    condition = "H"
+
+    data {
+      ref_id = "G"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        region     = var.aws_region,
+        namespace  = "AWS/Lambda",
+        metricName = "Invocations",
+        dimensions = { FunctionName = var.lambda_name },
+        statistic  = "Sum",
+        period     = 300
+      })
+    }
+
+    data {
+      ref_id = "H"
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [{
+          evaluator = { params = [var.invocation_threshold], type = "gt" },
+          operator  = { type = "and" },
+          query     = { params = ["G"] },
+          reducer   = { type = "sum" },
+          type      = "query"
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    labels = {
+      severity = "medium"
+      email    = var.deploy_env
+    }
+    annotations = {
+      summary = "Spike in Lambda ${var.lambda_name} invocations."
+    }
+  }
+}
