@@ -1,0 +1,110 @@
+🔵 In variables.tf (alert module)
+hcl
+Copy
+Edit
+variable "api_gateway_name" {
+  type        = string
+  description = "Name of the API Gateway (ApiName dimension value)"
+}
+
+variable "api_gateway_5xx_threshold" {
+  type        = number
+  description = "Threshold for API Gateway 5XX Errors"
+  default     = 10  # >10 errors/min or >5% of requests
+}
+
+variable "api_gateway_4xx_threshold" {
+  type        = number
+  description = "Threshold for API Gateway 4XX Errors"
+  default     = 10  # adjustable based on traffic pattern
+}
+
+variable "api_gateway_latency_threshold" {
+  type        = number
+  description = "Threshold for API Gateway latency in milliseconds"
+  default     = 1000  # 1 second = 1000 ms
+}
+
+variable "api_gateway_cache_hit_threshold" {
+  type        = number
+  description = "Threshold for API Gateway cache hit rate (percentage)"
+  default     = 60  # <60% considered low
+}
+
+variable "api_gateway_request_spike_threshold" {
+  type        = number
+  description = "Threshold for API Gateway request spike detection"
+  default     = 100  # Depends on baseline traffic, adjust per API
+}
+🟢 In your input.tfvars (per environment)
+Example for DEV environment:
+
+hcl
+Copy
+Edit
+api_gateway_name = "your-api-gateway-name"    # (actual API Name seen in CloudWatch)
+
+api_gateway_5xx_threshold = 5
+api_gateway_4xx_threshold = 20
+api_gateway_latency_threshold = 1500
+api_gateway_cache_hit_threshold = 50
+api_gateway_request_spike_threshold = 200
+✅ You can tweak the input.tfvars thresholds based on each environment (DEV vs PROD, etc).
+
+
+🔵 Here’s what you should add to your root variables.tf:
+h
+Copy
+Edit
+variable "api_gateway_name" {
+  type        = string
+  description = "Name of the API Gateway to monitor."
+}
+
+variable "api_gateway_5xx_threshold" {
+  type        = number
+  description = "Threshold for 5XX Errors in API Gateway."
+}
+
+variable "api_gateway_4xx_threshold" {
+  type        = number
+  description = "Threshold for 4XX Errors in API Gateway."
+}
+
+variable "api_gateway_latency_threshold" {
+  type        = number
+  description = "Threshold for average API Gateway latency (in ms)."
+}
+
+variable "api_gateway_cache_hit_threshold" {
+  type        = number
+  description = "Threshold for cache hit rate (percentage) in API Gateway."
+}
+
+variable "api_gateway_request_spike_threshold" {
+  type        = number
+  description = "Threshold for request count spike in API Gateway."
+}
+🛠 Then in your root main.tf, pass the variables into the alerts module like this:
+hcl
+Copy
+Edit
+module "alerts" {
+  source = "../modules/alerts"
+
+  api_gateway_name                  = var.api_gateway_name
+  api_gateway_5xx_threshold          = var.api_gateway_5xx_threshold
+  api_gateway_4xx_threshold          = var.api_gateway_4xx_threshold
+  api_gateway_latency_threshold      = var.api_gateway_latency_threshold
+  api_gateway_cache_hit_threshold    = var.api_gateway_cache_hit_threshold
+  api_gateway_request_spike_threshold = var.api_gateway_request_spike_threshold
+
+  # plus the other variables like lambda, alb, dynamodb ones...
+}
+✅ Summary:
+
+File	Action
+modules/alerts/variables.tf	Define all variables needed by the alert rules inside the module.
+root/variables.tf	Mirror those variables here if you want to expose/override them at the root level cleanly.
+root/input.tfvars	Assign specific values (different per environment)
+root/main.tf	Pass them when calling the module
