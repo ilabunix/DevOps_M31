@@ -1,0 +1,375 @@
+rule {
+  name      = "API GW 5XX Errors - ${var.api_gateway_name}"
+  condition = "C"
+
+  data {
+    ref_id = "A"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = var.cloudwatch_data_source_uid
+    model = jsonencode({
+      ref_id      = "A"
+      datasource  = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+      region      = var.aws_region
+      namespace   = "AWS/ApiGateway"
+      metricName  = "5XXError"
+      dimensions  = { ApiName = var.api_gateway_name }
+      statistics  = ["Sum"]
+      period      = "300"
+      type        = "timeseries"
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "B"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "B"
+      expression  = "A"
+      type        = "reduce"
+      reducer     = "last"
+      datasource  = { type = "__expr__", uid = "__expr__" }
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "C"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "C"
+      expression  = "B"
+      type        = "threshold"
+      conditions  = [{
+        evaluator = { type = "gt", params = [var.api_gateway_5xx_threshold] }
+        operator  = { type = "and" }
+        reducer   = { type = "last", params = [] }
+        query     = { ref_id = "B", type = "reduce" }
+      }]
+    })
+  }
+
+  no_data_state  = "OK"
+  exec_err_state = "Alerting"
+  annotations = {
+    summary = "API Gateway ${var.api_gateway_name} has high 5XX errors."
+  }
+  labels = {
+    severity = "critical"
+    env      = var.deploy_env
+  }
+}
+
+rule {
+  name      = "API GW Latency - ${var.api_gateway_name}"
+  condition = "C"
+
+  data {
+    ref_id = "A"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = var.cloudwatch_data_source_uid
+    model = jsonencode({
+      ref_id      = "A"
+      datasource  = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+      region      = var.aws_region
+      namespace   = "AWS/ApiGateway"
+      metricName  = "Latency"
+      dimensions  = { ApiName = var.api_gateway_name }
+      statistics  = ["Average"]
+      period      = "300"
+      type        = "timeseries"
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "B"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "B"
+      expression  = "A"
+      type        = "reduce"
+      reducer     = "last"
+      datasource  = { type = "__expr__", uid = "__expr__" }
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "C"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "C"
+      expression  = "B"
+      type        = "threshold"
+      conditions  = [{
+        evaluator = { type = "gt", params = [var.api_gateway_latency_threshold] }
+        operator  = { type = "and" }
+        reducer   = { type = "last", params = [] }
+        query     = { ref_id = "B", type = "reduce" }
+      }]
+    })
+  }
+
+  no_data_state  = "OK"
+  exec_err_state = "Alerting"
+  annotations = {
+    summary = "API Gateway ${var.api_gateway_name} latency is high."
+  }
+  labels = {
+    severity = "high"
+    env      = var.deploy_env
+  }
+}
+
+rule {
+  name      = "API GW 4XX Errors - ${var.api_gateway_name}"
+  condition = "C"
+
+  data {
+    ref_id = "A"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = var.cloudwatch_data_source_uid
+    model = jsonencode({
+      ref_id      = "A"
+      datasource  = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+      region      = var.aws_region
+      namespace   = "AWS/ApiGateway"
+      metricName  = "4XXError"
+      dimensions  = { ApiName = var.api_gateway_name }
+      statistics  = ["Sum"]
+      period      = "300"
+      type        = "timeseries"
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "B"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "B"
+      expression  = "A"
+      type        = "reduce"
+      reducer     = "last"
+      datasource  = { type = "__expr__", uid = "__expr__" }
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "C"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "C"
+      expression  = "B"
+      type        = "threshold"
+      conditions  = [{
+        evaluator = { type = "gt", params = [var.api_gateway_4xx_threshold] }
+        operator  = { type = "and" }
+        reducer   = { type = "last", params = [] }
+        query     = { ref_id = "B", type = "reduce" }
+      }]
+    })
+  }
+
+  no_data_state  = "OK"
+  exec_err_state = "Alerting"
+  annotations = {
+    summary = "API Gateway ${var.api_gateway_name} has elevated 4XX errors."
+  }
+  labels = {
+    severity = "high"
+    env      = var.deploy_env
+  }
+}
+
+rule {
+  name      = "API GW Cache Hit Rate - ${var.api_gateway_name}"
+  condition = "C"
+
+  data {
+    ref_id = "A"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = var.cloudwatch_data_source_uid
+    model = jsonencode({
+      ref_id      = "A"
+      datasource  = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+      region      = var.aws_region
+      namespace   = "AWS/ApiGateway"
+      metricName  = "CacheHitCount"
+      dimensions  = { ApiName = var.api_gateway_name }
+      statistics  = ["Sum"]
+      period      = "300"
+      type        = "timeseries"
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "B"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "B"
+      expression  = "A"
+      type        = "reduce"
+      reducer     = "last"
+      datasource  = { type = "__expr__", uid = "__expr__" }
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "C"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "C"
+      expression  = "B"
+      type        = "threshold"
+      conditions  = [{
+        evaluator = { type = "lt", params = [var.api_gateway_cache_hit_threshold] }
+        operator  = { type = "and" }
+        reducer   = { type = "last", params = [] }
+        query     = { ref_id = "B", type = "reduce" }
+      }]
+    })
+  }
+
+  no_data_state  = "OK"
+  exec_err_state = "Alerting"
+  annotations = {
+    summary = "API Gateway ${var.api_gateway_name} cache hit rate is low."
+  }
+  labels = {
+    severity = "medium"
+    env      = var.deploy_env
+  }
+}
+
+rule {
+  name      = "API GW Request Count Spike - ${var.api_gateway_name}"
+  condition = "C"
+
+  data {
+    ref_id = "A"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = var.cloudwatch_data_source_uid
+    model = jsonencode({
+      ref_id      = "A"
+      datasource  = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+      region      = var.aws_region
+      namespace   = "AWS/ApiGateway"
+      metricName  = "Count"
+      dimensions  = { ApiName = var.api_gateway_name }
+      statistics  = ["Sum"]
+      period      = "300"
+      type        = "timeseries"
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "B"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "B"
+      expression  = "A"
+      type        = "reduce"
+      reducer     = "last"
+      datasource  = { type = "__expr__", uid = "__expr__" }
+      intervalMs  = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "C"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "C"
+      expression  = "B"
+      type        = "threshold"
+      conditions  = [{
+        evaluator = { type = "gt", params = [var.api_gateway_request_spike_threshold] }
+        operator  = { type = "or" }
+        reducer   = { type = "last", params = [] }
+        query     = { ref_id = "B", type = "reduce" }
+      }]
+    })
+  }
+
+  no_data_state  = "OK"
+  exec_err_state = "Alerting"
+  annotations = {
+    summary = "API Gateway ${var.api_gateway_name} request count spike detected."
+  }
+  labels = {
+    severity = "medium"
+    env      = var.deploy_env
+  }
+}
+
