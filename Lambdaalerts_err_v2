@@ -1,0 +1,80 @@
+resource "grafana_rule_group" "lambda_alerts" {
+  name         = "Lambda Alerts - ${var.lambda_name}"
+  folder_uid   = var.terraform_folder_uid
+  interval_seconds = 300
+
+  rule {
+    name      = "Lambda Errors - ${var.lambda_name}"
+    condition = "C"
+
+    data {
+      refId = "A"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        refId       = "A"
+        datasource  = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region      = var.aws_region
+        namespace   = "AWS/Lambda"
+        metricName  = "Errors"
+        dimensions  = { FunctionName = var.lambda_name }
+        statistics  = ["Sum"]
+        period      = "300"
+        type        = "timeseries"
+        intervalMs  = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      refId = "B"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        refId     = "B"
+        expression = "A"
+        type      = "reduce"
+        reducer   = "last"
+        datasource = { type = "__expr__", uid = "__expr__" }
+        intervalMs = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      refId = "C"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        refId     = "C"
+        expression = "B"
+        type      = "threshold"
+        conditions = [{
+          evaluator = { type = "gt", params = [var.lambda_error_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { refId = "B", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state   = "OK"
+    exec_err_state  = "Alerting"
+    annotations = {
+      summary = "Lambda ${var.lambda_name} is throwing errors."
+    }
+    labels = {
+      severity = "critical"
+      env      = var.deploy_env
+    }
+  }
+}
