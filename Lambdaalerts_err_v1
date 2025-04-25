@@ -1,0 +1,93 @@
+resource "grafana_rule_group" "lambda_alerts" {
+  name         = "Lambda Alerts - ${var.lambda_name}"
+  folder_uid   = var.terraform_folder_uid
+  interval_seconds = 300
+
+  rule {
+    name      = "Lambda Errors - ${var.lambda_name}"
+    condition = "C"
+
+    data {
+      ref_id             = "A"
+      relative_time_range {
+        from = 0
+        to   = 300
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        alias      = "{{metric}} {{stat}}"
+        datasource = {
+          type = "cloudwatch"
+          uid  = var.cloudwatch_data_source_uid
+        }
+        namespace   = "AWS/Lambda"
+        metricName  = "Errors"
+        statistics  = ["Sum"]
+        dimensions  = {
+          FunctionName = var.lambda_name
+        }
+        region      = var.aws_region
+        period      = 300
+        refId       = "A"
+        type        = "timeseries"
+      })
+    }
+
+    data {
+      ref_id             = "B"
+      relative_time_range {
+        from = 0
+        to   = 300
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        expression = "A"
+        reducer    = "last"
+        refId      = "B"
+        type       = "reduce"
+      })
+    }
+
+    data {
+      ref_id             = "C"
+      relative_time_range {
+        from = 0
+        to   = 300
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        conditions = [
+          {
+            evaluator = {
+              params   = [var.lambda_error_threshold]
+              type     = "gt"
+            }
+            operator = {
+              type = "and"
+            }
+            query = {
+              params = ["B"]
+            }
+            reducer = {
+              type   = "last"
+              params = []
+            }
+            type = "query"
+          }
+        ]
+        refId = "C"
+        type  = "threshold"
+      })
+    }
+
+    no_data_state   = "OK"
+    exec_err_state  = "Alerting"
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+    annotations = {
+      summary = "Lambda ${var.lambda_name} is throwing errors."
+    }
+  }
+}
