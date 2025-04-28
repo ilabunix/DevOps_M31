@@ -1,0 +1,100 @@
+✅ In modules/alerts/variables.tf (inside your alerts module)
+hcl
+Copy
+Edit
+variable "alb_name" {
+  type        = string
+  description = "The ALB Load Balancer full name (from CloudWatch dimension)."
+}
+
+variable "alb_5xx_error_threshold" {
+  type        = number
+  description = "Threshold for ALB 5XX errors triggering alert."
+  default     = 10
+}
+
+variable "alb_target_response_time_threshold" {
+  type        = number
+  description = "Threshold for ALB Target Response Time triggering alert (in seconds)."
+  default     = 1
+}
+
+variable "alb_tls_error_threshold" {
+  type        = number
+  description = "Threshold for ALB TLS negotiation errors triggering alert."
+  default     = 10
+}
+
+variable "alb_connection_count_threshold" {
+  type        = number
+  description = "Threshold for ALB Active Connection Count spike triggering alert."
+  default     = 100
+}
+✅ In root-level variables.tf (your root project)
+Same thing — define matching variables in your root variables.tf to allow the root module to pass them to the alerts module.
+
+hcl
+Copy
+Edit
+variable "alb_name" {
+  type        = string
+  description = "The ALB Load Balancer full name (CloudWatch dimension)."
+}
+
+variable "alb_5xx_error_threshold" {
+  type        = number
+  default     = 10
+}
+
+variable "alb_target_response_time_threshold" {
+  type        = number
+  default     = 1
+}
+
+variable "alb_tls_error_threshold" {
+  type        = number
+  default     = 10
+}
+
+variable "alb_connection_count_threshold" {
+  type        = number
+  default     = 100
+}
+✅ In your environment's input.tfvars (per env like dev, test, prod)
+You provide values for those variables in your input.tfvars file:
+
+hcl
+Copy
+Edit
+alb_name = "app/alb-name/abc1234567890abcdef"
+
+alb_5xx_error_threshold             = 10
+alb_target_response_time_threshold  = 1
+alb_tls_error_threshold             = 10
+alb_connection_count_threshold      = 100
+(alb_name must exactly match your CloudWatch LoadBalancer dimension string.)
+
+
+
+In modules/alerts/variables.tf:
+hcl
+Copy
+Edit
+variable "alb_target_5xx_threshold" {
+  type        = number
+  description = "Threshold for Target 5XX errors (errors from backend targets)."
+  default     = 10
+}
+In root variables.tf:
+hcl
+Copy
+Edit
+variable "alb_target_5xx_threshold" {
+  type = number
+  default = 10
+}
+In input.tfvars:
+hcl
+Copy
+Edit
+alb_target_5xx_threshold = 10
