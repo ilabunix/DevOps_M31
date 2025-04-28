@@ -1,0 +1,309 @@
+resource "grafana_rule_group" "alb_alerts" {
+  count             = var.alb_name != null ? 1 : 0
+  name              = "ALB Alerts - ${var.alb_name}"
+  folder_uid        = var.terraform_folder_uid
+  interval_seconds  = 300
+
+  rule {
+    name      = "ALB 5XX Errors - ${var.alb_name}"
+    condition = "C"
+
+    data {
+      ref_id = "A"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "A"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/ApplicationELB"
+        metricName    = "HTTPCode_Target_5XX_Count"
+        dimensions    = { LoadBalancer = var.alb_name }
+        statistics    = ["Sum"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "B"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "B"
+        expression    = "A"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "C"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "C"
+        expression  = "B"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.alb_5xx_error_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "B", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    annotations = {
+      summary = "ALB ${var.alb_name} has elevated 5XX errors."
+    }
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+  }
+
+  # --- Target Response Time Rule
+  rule {
+    name      = "ALB Target Response Time - ${var.alb_name}"
+    condition = "C"
+
+    data {
+      ref_id = "D"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "D"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/ApplicationELB"
+        metricName    = "TargetResponseTime"
+        dimensions    = { LoadBalancer = var.alb_name }
+        statistics    = ["Average"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "E"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "E"
+        expression    = "D"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "F"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "F"
+        expression  = "E"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.alb_target_response_time_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "E", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    annotations = {
+      summary = "ALB ${var.alb_name} target response time is high."
+    }
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+  }
+
+  # --- TLS Negotiation Error Rule
+  rule {
+    name      = "ALB TLS Negotiation Errors - ${var.alb_name}"
+    condition = "C"
+
+    data {
+      ref_id = "G"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "G"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/ApplicationELB"
+        metricName    = "TLSNegotiationErrorCount"
+        dimensions    = { LoadBalancer = var.alb_name }
+        statistics    = ["Sum"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "H"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "H"
+        expression    = "G"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "I"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "I"
+        expression  = "H"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.alb_tls_error_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "H", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    annotations = {
+      summary = "ALB ${var.alb_name} is seeing high TLS negotiation errors."
+    }
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+  }
+
+  # --- Active Connection Count Spike Rule
+  rule {
+    name      = "ALB Connection Count Spike - ${var.alb_name}"
+    condition = "C"
+
+    data {
+      ref_id = "J"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "J"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/ApplicationELB"
+        metricName    = "ActiveConnectionCount"
+        dimensions    = { LoadBalancer = var.alb_name }
+        statistics    = ["Average"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "K"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "K"
+        expression    = "J"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "L"
+      relative_time_range {
+        from = 300
+        to   = 0
+      }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "L"
+        expression  = "K"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.alb_connection_count_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "K", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+    annotations = {
+      summary = "ALB ${var.alb_name} is seeing a spike in connection counts."
+    }
+    labels = {
+      severity = "high"
+      email    = var.deploy_env
+    }
+  }
+}
