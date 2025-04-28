@@ -1,0 +1,74 @@
+rule {
+  name      = "ALB Target 5XX Errors - ${var.alb_name}"
+  condition = "C"
+
+  data {
+    ref_id = "M"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = var.cloudwatch_data_source_uid
+    model = jsonencode({
+      ref_id        = "M"
+      datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+      region        = var.aws_region
+      namespace     = "AWS/ApplicationELB"
+      metricName    = "HTTPCode_Target_5XX_Count"
+      dimensions    = { LoadBalancer = var.alb_name }
+      statistics    = ["Sum"]
+      period        = "300"
+      type          = "timeseries"
+      intervalMs    = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "N"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id        = "N"
+      expression    = "M"
+      type          = "reduce"
+      reducer       = "last"
+      datasource    = { type = "__expr__", uid = "__expr__" }
+      intervalMs    = 1000
+      maxDataPoints = 43200
+    })
+  }
+
+  data {
+    ref_id = "O"
+    relative_time_range {
+      from = 300
+      to   = 0
+    }
+    datasource_uid = "__expr__"
+    model = jsonencode({
+      ref_id      = "O"
+      expression  = "N"
+      type        = "threshold"
+      conditions  = [{
+        evaluator = { type = "gt", params = [var.alb_target_5xx_threshold] }
+        operator  = { type = "and" }
+        reducer   = { type = "last", params = [] }
+        query     = { ref_id = "N", type = "reduce" }
+      }]
+    })
+  }
+
+  no_data_state  = "OK"
+  exec_err_state = "Alerting"
+  annotations = {
+    summary = "ALB ${var.alb_name} backend target is returning 5XX errors."
+  }
+  labels = {
+    severity = "critical"
+    email    = var.deploy_env
+  }
+}
