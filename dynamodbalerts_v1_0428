@@ -1,0 +1,393 @@
+resource "grafana_rule_group" "dynamodb_alerts" {
+  count            = var.dynamodb_table_name != null ? 1 : 0
+  name             = "DynamoDB Alerts - ${var.dynamodb_table_name}"
+  folder_uid       = var.terraform_folder_uid
+  interval_seconds = 300
+
+  # --- System Errors Alert
+  rule {
+    name      = "DynamoDB System Errors - ${var.dynamodb_table_name}"
+    condition = "C"
+
+    data {
+      ref_id = "A"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "A"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/DynamoDB"
+        metricName    = "SystemErrors"
+        dimensions    = { TableName = var.dynamodb_table_name }
+        statistics    = ["Sum"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "B"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "B"
+        expression    = "A"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "C"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "C"
+        expression  = "B"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.dynamodb_system_error_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "B", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+
+    annotations = {
+      summary = "DynamoDB ${var.dynamodb_table_name} is experiencing system errors."
+    }
+
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+  }
+
+  # --- Throttled Requests Alert
+  rule {
+    name      = "DynamoDB Throttled Requests - ${var.dynamodb_table_name}"
+    condition = "F"
+
+    data {
+      ref_id = "D"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "D"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/DynamoDB"
+        metricName    = "ThrottledRequests"
+        dimensions    = { TableName = var.dynamodb_table_name }
+        statistics    = ["Sum"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "E"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "E"
+        expression    = "D"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "F"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "F"
+        expression  = "E"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.dynamodb_throttled_requests_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "E", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+
+    annotations = {
+      summary = "DynamoDB ${var.dynamodb_table_name} is experiencing throttled requests."
+    }
+
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+  }
+
+  # --- Successful Request Latency Alert
+  rule {
+    name      = "DynamoDB Successful Request Latency - ${var.dynamodb_table_name}"
+    condition = "I"
+
+    data {
+      ref_id = "G"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "G"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/DynamoDB"
+        metricName    = "SuccessfulRequestLatency"
+        dimensions    = { TableName = var.dynamodb_table_name }
+        statistics    = ["Average"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "H"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "H"
+        expression    = "G"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "I"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "I"
+        expression  = "H"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.dynamodb_successful_latency_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "H", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+
+    annotations = {
+      summary = "DynamoDB ${var.dynamodb_table_name} has high successful request latency."
+    }
+
+    labels = {
+      severity = "high"
+      email    = var.deploy_env
+    }
+  }
+
+  # --- User Errors Alert
+  rule {
+    name      = "DynamoDB User Errors - ${var.dynamodb_table_name}"
+    condition = "L"
+
+    data {
+      ref_id = "J"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "J"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/DynamoDB"
+        metricName    = "UserErrors"
+        dimensions    = { TableName = var.dynamodb_table_name }
+        statistics    = ["Sum"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "K"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "K"
+        expression    = "J"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "L"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "L"
+        expression  = "K"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.dynamodb_user_error_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "K", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+
+    annotations = {
+      summary = "DynamoDB ${var.dynamodb_table_name} is encountering user errors."
+    }
+
+    labels = {
+      severity = "critical"
+      email    = var.deploy_env
+    }
+  }
+
+  # --- Replication Latency Alert
+  rule {
+    name      = "DynamoDB Replication Latency - ${var.dynamodb_table_name}"
+    condition = "O"
+
+    data {
+      ref_id = "M"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = var.cloudwatch_data_source_uid
+      model = jsonencode({
+        ref_id        = "M"
+        datasource    = { type = "cloudwatch", uid = var.cloudwatch_data_source_uid }
+        region        = var.aws_region
+        namespace     = "AWS/DynamoDB"
+        metricName    = "ReplicationLatency"
+        dimensions    = { TableName = var.dynamodb_table_name }
+        statistics    = ["Maximum"]
+        period        = "300"
+        type          = "timeseries"
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "N"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id        = "N"
+        expression    = "M"
+        type          = "reduce"
+        reducer       = "last"
+        datasource    = { type = "__expr__", uid = "__expr__" }
+        intervalMs    = 1000
+        maxDataPoints = 43200
+      })
+    }
+
+    data {
+      ref_id = "O"
+      relative_time_range { from = 300, to = 0 }
+      datasource_uid = "__expr__"
+      model = jsonencode({
+        ref_id      = "O"
+        expression  = "N"
+        type        = "threshold"
+        conditions  = [{
+          evaluator = { type = "gt", params = [var.dynamodb_replication_latency_threshold] }
+          operator  = { type = "and" }
+          reducer   = { type = "last", params = [] }
+          query     = { ref_id = "N", type = "reduce" }
+        }]
+      })
+    }
+
+    no_data_state  = "OK"
+    exec_err_state = "Alerting"
+
+    annotations = {
+      summary = "DynamoDB ${var.dynamodb_table_name} has high replication latency."
+    }
+
+    labels = {
+      severity = "high"
+      email    = var.deploy_env
+    }
+  }
+}
+
+
+========================================================
+In modules/alerts/variables.tf:
+hcl
+Copy
+Edit
+variable "dynamodb_table_name" {
+  type        = string
+  description = "Name of the DynamoDB Table."
+}
+
+variable "dynamodb_system_error_threshold" {
+  type        = number
+  description = "Threshold for system errors."
+  default     = 1
+}
+
+variable "dynamodb_throttled_requests_threshold" {
+  type        = number
+  description = "Threshold for throttled requests."
+  default     = 1
+}
+
+variable "dynamodb_successful_latency_threshold" {
+  type        = number
+  description = "Threshold for successful request latency (ms)."
+  default     = 300
+}
+
+variable "dynamodb_user_error_threshold" {
+  type        = number
+  description = "Threshold for user errors."
+  default     = 1
+}
+
+variable "dynamodb_replication_latency_threshold" {
+  type        = number
+  description = "Threshold for replication latency (seconds)."
+  default     = 30
+}
+✅ Same goes into root variables.tf and your input.tfvars.
