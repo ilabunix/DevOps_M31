@@ -1,0 +1,184 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudOps AI Assistant with AWS Bedrock Titan, LangChain S3 Loader, and Console Chatbot"
+
+Resources:
+
+  # 🔹 KMS Key for encrypting S3, DynamoDB, and CloudWatch logs
+  CloudOpsKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      EnableKeyRotation: true
+      Description: "KMS key for CloudOps AI resources"
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowRoot
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
+            Resource: "*"
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudOpsAIExecutionRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: CloudOpsAIPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "bedrock:InvokeModel"
+                  - "s3:GetObject"
+                  - "s3:ListBucket"
+                  - "kms:Decrypt"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "dynamodb:PutItem"
+                  - "dynamodb:GetItem"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 S3 Bucket for troubleshooting knowledge base
+  S3KnowledgeBase:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: cloudops-ai-knowledge
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref CloudOpsKMSKey
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 DynamoDB for chat history (optional context tracking)
+  ChatHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CloudOpsChatHistory
+      AttributeDefinitions:
+        - AttributeName: query
+          AttributeType: S
+      KeySchema:
+        - AttributeName: query
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        KMSMasterKeyId: !Ref CloudOpsKMSKey
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 CloudWatch Log Group
+  CloudOpsAILogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "/aws/lambda/CloudOpsAI"
+      RetentionInDays: 7
+      KmsKeyId: !Ref CloudOpsKMSKey
+      Tags:
+        - Key: Project
+          Value: CloudOpsAI
+
+  # 🔹 Lambda function for AI assistant
+  CloudOpsAIFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CloudOpsAI
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: python3.9
+      Handler: ai_handler.lambda_handler
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          S3_KNOWLEDGE_BUCKET: !Ref S3KnowledgeBase
+          MODEL_ID: "amazon.titan-text-express-v1"
+          CHAT_HISTORY_TABLE: !Ref ChatHistoryTable
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          from langchain.document_loaders import S3FileLoader
+
+          bedrock = boto3.client("bedrock-runtime")
+          s3 = boto3.client("s3")
+          dynamodb = boto3.resource("dynamodb")
+
+          bucket = "cloudops-ai-knowledge"
+          table_name = "CloudOpsChatHistory"
+          model_id = "amazon.titan-text-express-v1"
+
+          def lambda_handler(event, context):
+              query = event.get("query", "").strip()
+              if not query:
+                  return {"response": "Please enter a valid question."}
+
+              loader = S3FileLoader(bucket=bucket)
+              docs = loader.load()
+              context_docs = [doc.page_content for doc in docs if query.lower() in doc.page_content.lower()]
+              if not context_docs:
+                  return {"response": "No matching documents found."}
+
+              response_text = ask_bedrock(query, context_docs)
+              save_to_dynamodb(query, response_text)
+              return {"response": response_text}
+
+          def ask_bedrock(query, docs):
+              context = "\n".join(docs)
+              payload = {
+                  "prompt": f"Troubleshooting Query: {query}\n\nRelevant Docs:\n{context}",
+                  "maxTokens": 500
+              }
+              response = bedrock.invoke_model(
+                  modelId=model_id,
+                  body=json.dumps(payload)
+              )
+              result = json.loads(response["body"].read())
+              return result.get("results", result.get("completion", "No response."))
+
+          def save_to_dynamodb(query, response):
+              table = dynamodb.Table(table_name)
+              table.put_item(Item={"query": query, "response": response})
+
+Outputs:
+  LambdaFunctionArn:
+    Description: "ARN of the AI Assistant Lambda"
+    Value: !GetAtt CloudOpsAIFunction.Arn
+
+  S3KnowledgeBaseBucket:
+    Description: "S3 Bucket for temporary troubleshooting documents"
+    Value: !Ref S3KnowledgeBase
+
+  ChatHistoryDynamoDBTable:
+    Description: "DynamoDB Table for AI chat history"
+    Value: !Ref ChatHistoryTable
+
+  KMSKeyArn:
+    Description: "KMS Key for encryption"
+    Value: !Ref CloudOpsKMSKey
