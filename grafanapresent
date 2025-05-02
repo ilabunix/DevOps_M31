@@ -1,0 +1,129 @@
+
+⸻
+
+Over the past few weeks, I’ve been working on building a reusable, automated solution for managing Grafana dashboards and alerting rules using Terraform. The main goal of this initiative was to standardize monitoring across AWS services and application environments, especially in support of the CFS2 migration. Rather than having each team manually configure dashboards or alerts, I wanted to provide an Infrastructure-as-Code approach that enables consistent deployment and quick onboarding for new services.
+
+To achieve this, I created a modular Terraform project that allows us to define dashboards and standalone alerts for core AWS services such as Lambda, Application Load Balancer (ALB), DynamoDB, API Gateway, and AWS Certificate Manager (ACM). Each service has its own alerting logic built using Grafana’s JSON-style model format, which is compatible with the newer grafana_rule_group resource introduced in the Terraform provider v2.17.0. Alerts are grouped logically by service and severity, and they’re completely decoupled from dashboards—allowing for flexibility and reusability across accounts.
+
+One of the key features of this setup is the use of for_each in Terraform to dynamically loop over resource names, such as multiple ALBs or Lambda functions, based on naming conventions like adt-*. This allows us to scale the alerting solution across teams without duplicating code. Thresholds for each alert are defined using variables in a centralized variables.tf and overridden via input.tfvars per environment, making it easy to tune sensitivity for different environments like dev, test, or prod.
+
+I also integrated this setup into GitLab CI/CD. The pipeline is structured to dynamically assemble the environment-specific input.tfvars, perform a Terraform plan, and apply changes automatically. State isolation is handled through dedicated S3 backend keys, ensuring that deployments by different teams or projects don’t interfere with each other. This helps maintain clean separation while still using a shared backend for state management.
+
+From a user experience perspective, the dashboards are designed to provide a single pane of glass view per account, and the alert rules can include links that open Grafana dashboards filtered to the relevant resource using URL variables. This makes it easier for teams to quickly navigate from an alert to the underlying metrics and take action.
+
+Overall, this solution has significantly reduced the manual effort required to onboard new services to Grafana monitoring. It ensures consistency, supports reuse, and enables faster deployment of operational observability. It also empowers embedded TechOps members to leverage a proven template rather than building everything from scratch.
+
+
+
+⸻
+
+1. Project Objective
+	•	Goal: Build a reusable, scalable Terraform-based solution to create Grafana dashboards and alert rules across AWS environments.
+	•	Why:
+	•	Eliminate manual dashboard setup.
+	•	Standardize alerting for core AWS services (Lambda, ALB, DynamoDB, ACM, API Gateway).
+	•	Empower embedded TechOps teams with reusable templates.
+
+⸻
+
+2. Key Accomplishments
+	•	Created a modular Terraform project with:
+	•	Dashboards defined per service.
+	•	Alert rules separated by severity (critical/warning).
+	•	Support for multiple services using for_each.
+	•	Implemented standalone Grafana alerts (not tied to panels).
+	•	Integrated alerts into GitLab CI/CD pipelines for automated deployment.
+
+⸻
+
+3. Alert Rule Highlights
+	•	Alert rules built for:
+	•	Lambda: Errors, Throttles, Duration
+	•	ALB: Target 5XX, TLS negotiation errors, Latency
+	•	DynamoDB: System errors, Throttling, Replication latency
+	•	ACM: Certificate expiry alerts
+	•	API Gateway: 5XX errors, latency, and cache metrics
+	•	Alert logic follows JSON-style HCL format (Grafana v2.17.0 provider compatibility).
+	•	Used jsonencode to structure model blocks for queries, reducers, evaluators.
+
+⸻
+
+4. Reusability & Parameterization
+	•	Variables defined in variables.tf and input.tfvars to:
+	•	Control resource names.
+	•	Customize alert thresholds per environment.
+	•	Reusable across teams with naming convention logic (adt-lambda*, adt-api*, etc).
+
+⸻
+
+5. Deployment Process
+	•	GitLab Pipeline:
+	•	setup_env merges dynamic input.tfvars.
+	•	terraform init, plan, apply triggered per environment.
+	•	State Isolation:
+	•	Each team/project has a dedicated S3 key to avoid cross-destruction.
+	•	Follows the format: grafana-monitoring/dev/terraform.tfstate.
+
+⸻
+
+6. Visualization & UX
+	•	Dashboards give a single pane of glass view by account/environment.
+	•	Option to link alerts to dynamic dashboards using variables in URL.
+
+⸻
+
+7. Benefits & Impact
+	•	Reduced setup time for new services and accounts.
+	•	Improved consistency in monitoring and incident response.
+	•	Reusable patterns for TechOps teams supporting multiple ADTs.
+	•	No vendor lock-in: everything codified, version-controlled, and environment-aware.
+
+
+Grafana Terraform Project Walkthrough – Key Highlights
+
+Objective
+	•	Standardize monitoring across AWS services using Terraform.
+	•	Eliminate manual setup of Grafana dashboards and alerts.
+	•	Support CFS2 migration by enabling reusable observability patterns.
+
+⸻
+
+What Was Built
+	•	Modular Terraform project for Grafana dashboards and alert rules.
+	•	Standalone alerts (not tied to panels) for:
+	•	Lambda (Errors, Throttles, Duration)
+	•	ALB (5XX errors, TLS errors, Latency)
+	•	DynamoDB (System errors, Throttling, Replication latency)
+	•	API Gateway (Latency, 5XX, Cache hit rate)
+	•	ACM (Certificate expiry)
+
+⸻
+
+How It Works
+	•	Terraform for_each used to dynamically loop over multiple resources (e.g., multiple ALBs).
+	•	Uses JSON-style alert model via jsonencode compatible with Grafana provider v2.17.0.
+	•	Alert conditions parameterized via variables.tf and input.tfvars.
+	•	Severity-based grouping of alerts (e.g., critical vs. warning).
+
+⸻
+
+CI/CD Integration
+	•	Integrated with GitLab pipeline:
+	•	setup_env job dynamically builds terraform.tfvars.
+	•	init, plan, and apply triggered per environment.
+	•	Terraform state isolation using S3 keys per project (grafana-monitoring/dev/terraform.tfstate).
+
+⸻
+
+Dashboards & Navigation
+	•	Dashboards support a single pane of glass view by account/environment.
+	•	Alert rules include clickable links to dynamic dashboards using variables in the URL.
+
+⸻
+
+Benefits
+	•	Reusable and scalable for all ADT and TechOps teams.
+	•	Faster onboarding of AWS services to observability.
+	•	Consistent monitoring across environments.
+	•	Codified and version-controlled – no vendor lock-in.
+
